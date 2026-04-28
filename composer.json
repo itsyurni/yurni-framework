@@ -8,8 +8,12 @@
     ],
     "autoload": {
         "psr-4": {
-            "yurni\\": "."
-        }
+            "yurni\\": "Yurni/",
+            "App\\": "app/"
+        },
+        "files": [
+            "Yurni/Helpers/helpers.php"
+        ]
     },
     "require": {
         "vlucas/phpdotenv": "^5.4"
