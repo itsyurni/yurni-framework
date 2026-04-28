@@ -1,6 +1,4 @@
 <?php
-session_start();
-
 require __DIR__ . '/../vendor/autoload.php';
 
 
@@ -17,10 +15,7 @@ $app = new Application();
 
 
 $app->get('/', [HomeController::class, 'index']);
-$app->get('/about', function (Response $response, Request $request) {
 
-    return $response->html('This is the about page.');
-});
 
 
 

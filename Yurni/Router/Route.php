@@ -95,33 +95,34 @@ class Route
     }
 
     // دوال للتحقق من نوع الطلب المسموح
-    public function isPost()
+    // تستخدم in_array لأن $method هي مصفوفة مثل ['get', 'post']
+    public function isPost(): bool
     {
-        return $this->getMethod() == "post";
+        return in_array('post', (array) $this->method, true);
     }
-    public function isPut()
+    public function isPut(): bool
     {
-        return $this->getMethod() == "put";
+        return in_array('put', (array) $this->method, true);
     }
-    public function isGet()
+    public function isGet(): bool
     {
-        return $this->getMethod() == "get";
+        return in_array('get', (array) $this->method, true);
     }
-    public function isPatch()
+    public function isPatch(): bool
     {
-        return $this->getMethod() == "patch";
+        return in_array('patch', (array) $this->method, true);
     }
-    public function isAny()
+    public function isAny(): bool
     {
-        return $this->getMethod() == "any";
+        return in_array('any', (array) $this->method, true);
     }
-    public function isDelete()
+    public function isDelete(): bool
     {
-        return $this->getMethod() == "delete";
+        return in_array('delete', (array) $this->method, true);
     }
-    public function isOnly()
+    public function isOnly(): bool
     {
-        return $this->getMethod() == "only";
+        return in_array('only', (array) $this->method, true);
     }
 
     /**

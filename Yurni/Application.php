@@ -51,6 +51,11 @@ class Application
      */
     public function __construct(array $inputs = [])
     {
+        // تشغيل الجلسة مرة واحدة فقط في دورة حياة الطلب
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
         $this->request = new Request($this);
         $this->response = new Response();
         $this->router = new Router($this);
