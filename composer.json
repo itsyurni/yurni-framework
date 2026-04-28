@@ -1,0 +1,17 @@
+{
+    "name": "yurni/framework",
+    "authors": [
+        {
+            "name": "Harizi Riyadh",
+            "email": "harizi.harizi@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "yurni\\": "."
+        }
+    },
+    "require": {
+        "vlucas/phpdotenv": "^5.4"
+    }
+}
