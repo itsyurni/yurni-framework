@@ -53,7 +53,9 @@ $app->run();
 
 ---
 
-## العربية
+---
+
+## العربية 🇸🇦
 
 **Yurni** هو إطار عمل PHP عصري وخفيف الوزن، مصمم من أجل البساطة والأداء العالي. يوفر الأدوات الأساسية لبناء تطبيقات ويب قوية دون التعقيدات الزائدة للأطر الضخمة.
 
@@ -66,28 +68,70 @@ $app->run();
 - **حماية مدمجة**: حماية تلقائية ضد هجمات CSRF والثغرات الشائعة.
 - **محرك قوالب**: نظام عرض ديناميكي وبسيط.
 
-### 🚀 ابدأ الآن
-قم بتعريف المسارات في ملف `public/index.php` وابدأ بناء تطبيقك فوراً!
+### 🛠️ متطلبات التشغيل
+قبل البدء، تأكد من توفر المتطلبات التالية في بيئتك:
+- **PHP**: إصدار 8.0 أو أعلى.
+- **Composer**: لإدارة المكتبات والاعتمادات.
+- **خادم ويب**: مثل Apache أو Nginx، أو استخدام خادم PHP المدمج للتطوير.
+- **قاعدة بيانات**: (اختياري) MySQL أو SQLite.
 
-### ⚙️ التثبيت والتنصيب
-1. **تحميل المشروع**:
+### ⚙️ إعداد بيئة العمل (Installation)
+
+بما أن إطار العمل متاح كحزمة Composer، يمكنك تثبيته في مشروعك الجديد عبر الخطوات التالية:
+
+1. **إنشاء مشروع جديد**:
    ```bash
-   git clone https://github.com/itsyurni/yurni-framework.git
+   mkdir my-new-app
+   cd my-new-app
    ```
-2. **تثبيت المكتبات**:
+
+2. **تثبيت إطار العمل**:
    ```bash
-   composer install
+   composer require yurni/framework
    ```
-3. **إعداد البيئة**:
-   قم بنسخ ملف الإعدادات وقم بضبط بيانات قاعدة البيانات:
-   ```bash
-   cp .env.example .env
+
+3. **إعداد بنية المجلدات**:
+   يجب أن يحتوي مشروعك على المجلدات التالية (بشكل افتراضي):
+   - `app/Controllers`: للمتحكمات.
+   - `app/Models`: للنماذج.
+   - `app/views`: لملفات العرض والقوالب.
+   - `public`: للملفات العامة ونقطة الدخول `index.php`.
+
+4. **إعداد ملف البيئة (.env)**:
+   قم بإنشاء ملف باسم `.env` في المجلد الرئيسي وضبط الإعدادات:
+   ```env
+   APP_NAME=YurniApp
+   APP_DEBUG=true
+   
+   DB_DRIVER=mysql
+   DB_HOST=127.0.0.1
+   DB_NAME=your_database
+   DB_USER=root
+   DB_PASS=
    ```
-4. **تشغيل التطبيق**:
-   استخدم سيرفر PHP الداخلي للبدء:
+
+5. **نقطة الدخول (public/index.php)**:
+   قم بإنشاء الملف وابدأ بتعريف مساراتك:
+   ```php
+   <?php
+   require_once __DIR__ . '/../vendor/autoload.php';
+   
+   use yurni\Application;
+   
+   $app = new Application(realpath(__DIR__ . '/../'));
+   
+   $app->get('/', function() {
+       return "Welcome to Yurni Framework!";
+   });
+   
+   $app->run();
+   ```
+
+6. **تشغيل المشروع**:
+   استخدم الأمر التالي للتشغيل السريع:
    ```bash
    php -S localhost:8000 -t public
    ```
 
-## 📄 License
-The Yurni Framework is open-sourced software licensed under the [MIT license](LICENSE).
+### 📄 الترخيص
+إطار عمل Yurni هو برمجية مفتوحة المصدر مرخصة تحت رخصة [MIT](LICENSE).
