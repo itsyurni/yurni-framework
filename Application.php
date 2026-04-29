@@ -1,4 +1,5 @@
 <?php
+
 namespace yurni;
 
 use yurni\Database\QueryBuilder;
@@ -55,32 +56,61 @@ class Application
     /**
      * منشئ الكلاس الأساسي
      * يقوم بتهيئة كائنات الطلب، الاستجابة، الموجه وإعداد بيئة العمل
-     * 
-     * @param string $basePath المسار الأساسي للمشروع (اختياري)
+     *
+     * @param string $basePath المسار الأساسي للمشروع (اختياري — يُكتشف تلقائياً إن لم يُمرَّر)
      */
     public function __construct(string $basePath = '')
     {
         self::$instance = $this;
-        // تحديد المسار الأساسي للمشروع
-        $this->basePath = $basePath ?: realpath(__DIR__);
 
+        // تحديد المسار الأساسي للمشروع
+        $this->basePath = $basePath !== '' ? realpath($basePath) : $this->detectBasePath();
 
         // تشغيل الجلسة مرة واحدة فقط في دورة حياة الطلب
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        $this->request = new Request($this);
+        $this->request  = new Request($this);
         $this->response = new Response();
-        $this->router = new Router($this);
+        $this->router   = new Router($this);
         $this->loadEnv();
         $this->loadViewAttr();
     }
 
     /**
+     * اكتشاف المسار الأساسي للمشروع تلقائياً
+     * يصعد من مجلد الملف الذي استدعى new Application()
+     * حتى يجد جذر المشروع (حيث يوجد composer.json أو .env)
+     *
+     * @return string
+     */
+    private function detectBasePath(): string
+    {
+        // نجلب مسار الملف الذي استدعى new Application() مباشرةً
+        $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+
+        // [0] = هذا الملف (Application.php) — [1] = الملف الذي كتب new Application()
+        $callerFile = $caller[1]['file'] ?? __FILE__;
+        $dir = dirname($callerFile);
+
+        // نصعد في شجرة المجلدات حتى نجد composer.json أو .env
+        $current = $dir;
+        while ($current !== dirname($current)) { // توقف عند جذر نظام الملفات
+            if (file_exists($current . '/composer.json') || file_exists($current . '/.env')) {
+                return realpath($current);
+            }
+            $current = dirname($current);
+        }
+
+        // fallback: مجلد الملف المستدعي مباشرةً
+        return realpath($dir);
+    }
+
+    /**
      * تحميل متغيرات البيئة من ملف .env وتخزينها في نظام الإعدادات
      */
-    private function loadEnv()
+    private function loadEnv(): void
     {
         $envFile = $this->basePath . '/.env';
         if (class_exists(\Dotenv\Dotenv::class)) {
@@ -89,10 +119,9 @@ class Application
         } elseif (file_exists($envFile)) {
             $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0)
-                    continue;
+                if (strpos(trim($line), '#') === 0) continue;
                 if (strpos($line, '=') !== false) {
-                    list($name, $value) = explode('=', $line, 2);
+                    [$name, $value] = explode('=', $line, 2);
                     $_ENV[trim($name)] = trim($value);
                 }
             }
@@ -103,24 +132,22 @@ class Application
     /**
      * تهيئة المتغيرات الأساسية المتاحة دائماً داخل قوالب العرض (Views)
      */
-    private function loadViewAttr()
+    private function loadViewAttr(): void
     {
-        return $this->viewAttr = [
-            "app" => $this,
-            "appRequest" => $this->request,
-            "appResponse" => $this->response
+        $this->viewAttr = [
+            'app'        => $this,
+            'appRequest' => $this->request,
+            'appResponse' => $this->response,
         ];
     }
 
-
-
     /**
      * إضافة بيانات جديدة لتكون متاحة داخل قوالب العرض
-     * 
+     *
      * @param array $args مصفوفة البيانات
      * @return self
      */
-    public function setViewAttr($args = [])
+    public function setViewAttr(array $args = []): self
     {
         foreach ($args as $key => $val) {
             $this->viewAttr[$key] = $val;
@@ -130,52 +157,53 @@ class Application
 
     /**
      * الحصول على البيانات المتاحة لقوالب العرض
-     * 
+     *
      * @return array
      */
-    public function getViewAttr()
+    public function getViewAttr(): array
     {
         return $this->viewAttr;
     }
 
     /**
      * تسجيل برمجية وسيطة (Middleware) جديدة
-     * 
-     * @param string $name اسم الـ Middleware
-     * @param callable|string|array $callable الكلاس أو الدالة المسؤولة
+     *
+     * @param string                 $name     اسم الـ Middleware
+     * @param callable|string|array  $callable الكلاس أو الدالة المسؤولة
      */
-    public function setMiddleware($name, $callable)
+    public function setMiddleware(string $name, $callable): void
     {
         $this->middlewares[$name] = $callable;
     }
 
     /**
      * تنفيذ والحصول على الـ Middleware المطلوب
-     * 
+     *
      * @param string $name اسم الـ Middleware
      * @return mixed
      */
-    public function getMiddleware($name)
+    public function getMiddleware(string $name): mixed
     {
-        return $this->hasMiddleware($name) ? $this->container()->call($this->middlewares[$name]) : false;
+        return $this->hasMiddleware($name)
+            ? $this->container()->call($this->middlewares[$name])
+            : false;
     }
 
     /**
      * التحقق من وجود الـ Middleware
-     * 
+     *
      * @param string $name اسم الـ Middleware
      * @return bool
      */
-    public function hasMiddleware($name)
+    public function hasMiddleware(string $name): bool
     {
         return isset($this->middlewares[$name]);
     }
 
     /**
      * الحصول على حاوية الحقن التلقائي (Dependency Injection Container)
-     * تعتمد نمط Singleton لضمان استخدام نسخة واحدة فقط طوال دورة حياة الطلب،
-     * مما يحافظ على الكائنات المسجلة مسبقاً ويُحسّن الأداء.
-     * 
+     * تعتمد نمط Singleton لضمان استخدام نسخة واحدة فقط طوال دورة حياة الطلب.
+     *
      * @return Container
      */
     public function container(): Container
@@ -185,20 +213,23 @@ class Application
 
             // تسجيل الكائنات كـ Singletons لمنع إعادة إنشائها
             $this->containerInstance->instance(get_class($this->response), $this->response);
-            $this->containerInstance->instance(get_class($this->request), $this->request);
-            $this->containerInstance->instance(get_class($this), $this);
-            $this->containerInstance->instance(Db::class, Db::getInstance());
-            $this->containerInstance->bind(QueryBuilder::class, static fn (Container $container): QueryBuilder => Db::getInstance()->query());
+            $this->containerInstance->instance(get_class($this->request),  $this->request);
+            $this->containerInstance->instance(get_class($this),           $this);
+            $this->containerInstance->instance(Db::class,                  Db::getInstance());
+            $this->containerInstance->bind(
+                QueryBuilder::class,
+                static fn(Container $c): QueryBuilder => Db::getInstance()->query()
+            );
 
-            // حقنها في قائمة الـ Args للاستخدامات البديلة وبأسماء مختصرة لدعم الـ Closures بدون Type Hinting
+            // حقن بأسماء مختصرة لدعم الـ Closures بدون Type Hinting
             $this->containerInstance->injectArgs([
                 get_class($this->response) => $this->response,
-                get_class($this->request) => $this->request,
-                get_class($this) => $this,
-                Db::class => Db::getInstance(),
-                'app' => $this,
-                'request' => $this->request,
-                'response' => $this->response,
+                get_class($this->request)  => $this->request,
+                get_class($this)           => $this,
+                Db::class                  => Db::getInstance(),
+                'app'                      => $this,
+                'request'                  => $this->request,
+                'response'                 => $this->response,
             ]);
         }
 
@@ -207,37 +238,37 @@ class Application
 
     /**
      * الحصول على كائن الموجه (Router)
-     * 
+     *
      * @return Router
      */
-    public function getRouter()
+    public function getRouter(): Router
     {
         return $this->router;
     }
 
     /**
      * الحصول على كائن الاستجابة (Response)
-     * 
+     *
      * @return Response
      */
-    public function getResponse()
+    public function getResponse(): Response
     {
         return $this->response;
     }
 
     /**
      * الحصول على كائن الطلب (Request)
-     * 
+     *
      * @return Request
      */
-    public function getRequest()
+    public function getRequest(): Request
     {
         return $this->request;
     }
 
     /**
      * الحصول على المسار الأساسي للمشروع
-     * 
+     *
      * @return string
      */
     public function getBasePath(): string
@@ -246,8 +277,8 @@ class Application
     }
 
     /**
-     * الحصول على نسخة التطبيق الحالية
-     * 
+     * الحصول على نسخة التطبيق الحالية (Singleton)
+     *
      * @return Application|null
      */
     public static function getInstance(): ?Application
@@ -262,95 +293,94 @@ class Application
     /**
      * تسجيل مسار من نوع GET
      *
-     * @param  string $path مسار الرابط
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function get($path, $callback)
+    public function get(string $path, $callback): \yurni\Router\Route
     {
-        return $this->router->register(["get"], $path, $callback);
+        return $this->router->register(['get'], $path, $callback);
     }
 
     /**
      * تسجيل مسار من نوع POST
      *
-     * @param  string $path مسار الرابط
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function post($path, $callback)
+    public function post(string $path, $callback): \yurni\Router\Route
     {
-        return $this->router->register(["post"], $path, $callback);
+        return $this->router->register(['post'], $path, $callback);
     }
 
     /**
      * تسجيل مسار من نوع PATCH
      *
-     * @param  string $path مسار الرابط
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function patch($path, $callback)
+    public function patch(string $path, $callback): \yurni\Router\Route
     {
-        return $this->router->register(["patch"], $path, $callback);
+        return $this->router->register(['patch'], $path, $callback);
     }
 
     /**
      * تسجيل مسار من نوع PUT
      *
-     * @param  string $path مسار الرابط
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function put($path, $callback)
+    public function put(string $path, $callback): \yurni\Router\Route
     {
-        return $this->router->register(["put"], $path, $callback);
+        return $this->router->register(['put'], $path, $callback);
     }
 
     /**
      * تسجيل مسار من نوع DELETE
      *
-     * @param  string $path مسار الرابط
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function delete($path, $callback)
+    public function delete(string $path, $callback): \yurni\Router\Route
     {
-        return $this->router->register(["delete"], $path, $callback);
+        return $this->router->register(['delete'], $path, $callback);
     }
 
     /**
      * تسجيل مسار يقبل جميع طرق الطلبات (GET, POST, PUT, DELETE, PATCH)
      *
-     * @param  string $path مسار الرابط
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function any($path, $callback)
+    public function any(string $path, $callback): \yurni\Router\Route
     {
-        return $this->router->register(["post", "get", "put", "delete", "patch"], $path, $callback);
+        return $this->router->register(['get', 'post', 'put', 'delete', 'patch'], $path, $callback);
     }
 
     /**
      * تسجيل مسار يقبل طرق محددة فقط يتم تمريرها كمصفوفة
      *
-     * @param  array $methods مصفوفة بالطرق المسموحة
-     * @param  string $path مسار الرابط
+     * @param  array                 $methods  مصفوفة بالطرق المسموحة
+     * @param  string                $path     مسار الرابط
      * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
      * @return \yurni\Router\Route
      */
-    public function only($methods = [], $path, $callback)
+    public function only(array $methods, string $path, $callback): \yurni\Router\Route
     {
         return $this->router->register($methods, $path, $callback);
     }
 
     /**
      * تشغيل التطبيق (معالجة الطلب وإرجاع الاستجابة)
-     * هذه الدالة تقوم بحماية الطلبات عبر فحص توكن الـ CSRF، ثم تقوم بحل الرابط وطباعة المخرجات.
-     * 
+     *
      * @return void|false
      */
-    public function run()
+    public function run(): void
     {
         try {
             // التحقق من توكن CSRF تلقائياً لطلبات POST, PUT, DELETE, PATCH
@@ -358,25 +388,28 @@ class Application
                 $token = $this->request->input('csrf_token');
                 if (!\yurni\Security\Csrf::validateToken($token)) {
                     http_response_code(403);
-                    echo "<h1>403 Forbidden</h1><p>CSRF token validation failed.</p>";
-                    return false;
+                    echo '<h1>403 Forbidden</h1><p>CSRF token validation failed.</p>';
+                    return;
                 }
             }
 
             // حل المسار وطباعة المخرجات النهائية
             echo $this->router->resolve();
-
         } catch (\Throwable $e) {
-            // معالجة الأخطاء الاستثنائية بشكل عام
-            error_log("Framework Error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+            error_log(
+                'Framework Error: ' . $e->getMessage() .
+                    ' in ' . $e->getFile() .
+                    ' on line ' . $e->getLine()
+            );
 
             http_response_code(500);
 
-            $debug = Config::get('APP_DEBUG', Config::get('app_debug', false));
-            $debug = filter_var($debug, FILTER_VALIDATE_BOOLEAN);
+            $debug = filter_var(
+                Config::get('APP_DEBUG', Config::get('app_debug', false)),
+                FILTER_VALIDATE_BOOLEAN
+            );
 
             if ($debug) {
-                // شاشة أخطاء احترافية مشابهة لـ Ignition / Whoops
                 echo "<!DOCTYPE html>
                 <html lang='en'>
                 <head>
@@ -389,7 +422,7 @@ class Application
                         .error-header h1 { margin: 0; font-size: 32px; font-weight: 700; }
                         .error-header p { margin: 10px 0 0 0; font-size: 18px; font-weight: 500; opacity: 0.9; }
                         .error-container { padding: 40px; max-width: 1200px; margin: 0 auto; }
-                        .error-section { background-color: #24283b; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3); border: 1px solid #414868; }
+                        .error-section { background-color: #24283b; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #414868; }
                         .error-section h3 { margin-top: 0; color: #7aa2f7; font-size: 20px; margin-bottom: 15px; border-bottom: 1px solid #414868; padding-bottom: 10px; }
                         .file-info { background-color: #1f2335; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 16px; color: #e0af68; border-left: 4px solid #ff9e64; margin-bottom: 20px; }
                         pre { background-color: #1f2335; color: #c0caf5; padding: 20px; border-radius: 6px; overflow-x: auto; font-size: 14px; line-height: 1.6; margin: 0; border: 1px solid #292e42; }
@@ -417,10 +450,9 @@ class Application
                     </div>
                 </body>
                 </html>";
-
             } else {
-                echo "<h1>500 Internal Server Error</h1>";
-                echo "<p>An unexpected error occurred. Please try again later.</p>";
+                echo '<h1>500 Internal Server Error</h1>';
+                echo '<p>An unexpected error occurred. Please try again later.</p>';
             }
         }
     }
