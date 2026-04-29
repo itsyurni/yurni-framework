@@ -12,11 +12,20 @@ use yurni\Http\Response;
  */
 class Application
 {
+    /**
+     * @var Application|null نسخة الـ Singleton من التطبيق
+     */
+    protected static ?Application $instance = null;
 
     /**
      * @var Router كائن الموجه المسؤول عن الروابط
      */
     protected Router $router;
+
+    /**
+     * @var string المسار الأساسي للمشروع
+     */
+    protected string $basePath;
 
     /**
      * @var Request كائن الطلب الحالي
@@ -47,10 +56,14 @@ class Application
      * منشئ الكلاس الأساسي
      * يقوم بتهيئة كائنات الطلب، الاستجابة، الموجه وإعداد بيئة العمل
      * 
-     * @param array $inputs مدخلات إضافية (اختياري)
+     * @param string $basePath المسار الأساسي للمشروع (اختياري)
      */
-    public function __construct(array $inputs = [])
+    public function __construct(string $basePath = '')
     {
+        self::$instance = $this;
+        // تحديد المسار الأساسي للمشروع
+        $this->basePath = $basePath ?: realpath(__DIR__ . '/../');
+
         // تشغيل الجلسة مرة واحدة فقط في دورة حياة الطلب
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -68,9 +81,9 @@ class Application
      */
     private function loadEnv()
     {
-        $envFile = __DIR__ . '/../.env';
+        $envFile = $this->basePath . '/.env';
         if (class_exists(\Dotenv\Dotenv::class)) {
-            $dotenv = \Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+            $dotenv = \Dotenv\Dotenv::createImmutable($this->basePath);
             $dotenv->safeLoad();
         } elseif (file_exists($envFile)) {
             $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -219,6 +232,26 @@ class Application
     public function getRequest()
     {
         return $this->request;
+    }
+
+    /**
+     * الحصول على المسار الأساسي للمشروع
+     * 
+     * @return string
+     */
+    public function getBasePath(): string
+    {
+        return $this->basePath;
+    }
+
+    /**
+     * الحصول على نسخة التطبيق الحالية
+     * 
+     * @return Application|null
+     */
+    public static function getInstance(): ?Application
+    {
+        return self::$instance;
     }
 
     /********************************************************************************

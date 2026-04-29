@@ -23,11 +23,12 @@ class View
     {
         if (self::$engine === null) {
             self::$engine = new Template([
-                'temp_path'  => Config::get('views_path',       __DIR__ . '/../app/views/'),
-                'cache_path' => Config::get('views_cache_path', __DIR__ . '/../app/views/cache/'),
+                'temp_path'  => Config::get('views_path',       base_path('app/views')),
+                'cache_path' => Config::get('views_cache_path', base_path('app/views/cache')),
                 'cache'      => Config::get('view_cache',       false),
                 'optimize'   => Config::get('view_optimize',    false),
             ]);
+
         }
 
         return self::$engine;

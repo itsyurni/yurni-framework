@@ -2,161 +2,125 @@
 namespace yurni\Http;
 
 /**
- * كلاس إدارة الجلسات (Session Management)
- * يوفر واجهة سهلة للتعامل مع الـ $_SESSION ويشمل دعماً لرسائل الـ Flash (رسائل لمرة واحدة).
+ * Session Manager
+ *
+ * Simple wrapper around PHP sessions with flash message support.
+ *
+ * Usage:
+ *   $session = new Session();
+ *   $session->set('user_id', 1);
+ *   $session->get('user_id');         // 1
+ *   $session->has('user_id');         // true
+ *   $session->remove('user_id');
+ *   $session->flash('success', 'Done!');
+ *   $session->getFlash('success');    // 'Done!'
+ *   $session->destroy();
  */
-class Session
-{
-    /**
-     * مفتاح التخزين المخصص لرسائل الـ Flash
-     */
-    protected const FLASH_KEY = 'flash_messages';
+class Session {
 
-    /**
-     * منشئ الكلاس
-     * يقوم بتشغيل الجلسة إذا لم تكن تعمل، ويهيئ رسائل الـ Flash للحذف في الطلب القادم.
-     */
-    public function __construct()
-    {
-        // تشغيل الجلسة بأمان
-        if ( $this->is_session_started() === FALSE ) {
-            session_start();
-        }
-    
-        // تعليم كافة رسائل الفلاش الحالية ليتم حذفها لاحقاً
-        $flashMessages = $_SESSION[self::FLASH_KEY] ?? [];
-        foreach ($flashMessages as $key => &$flashMessage) {
-            $flashMessage['remove'] = true;
-        }
-        $_SESSION[self::FLASH_KEY] = $flashMessages;
+    private const FLASH_KEY = '_flash';
+
+    public function __construct() {
+        $this->start();
+        $this->tickFlash();
     }
 
-    /**
-     * إنشاء رسالة فلاش (Flash Message) لمرة واحدة فقط
-     * ستبقى متاحة للطلب الحالي والطلب الذي يليه، ثم تُحذف تلقائياً.
-     * 
-     * @param string $key اسم الرسالة (مثال: 'success')
-     * @param string $message نص الرسالة
-     */
-    public function setFlash($key, $message)
-    {
-        $_SESSION[self::FLASH_KEY][$key] = [
-            'remove' => false,
-            'value' => $message
-        ];
-    }
+    // -------------------------------------------------------------------------
+    //  Core: get / set / has / remove
+    // -------------------------------------------------------------------------
 
-    /**
-     * التحقق مما إذا كانت الجلسة (Session) قد بدأت بالفعل
-     * 
-     * @return bool
-     */
-    public function is_session_started()
-    {
-        if ( php_sapi_name() !== 'cli' ) {
-            if ( version_compare(phpversion(), '5.4.0', '>=') ) {
-                return session_status() === PHP_SESSION_ACTIVE ? TRUE : FALSE;
-            } else {
-                return session_id() === '' ? FALSE : TRUE;
-            }
-        }
-        return FALSE;
-    }
-
-    /**
-     * جلب رسالة فلاش معينة
-     * 
-     * @param string $key اسم الرسالة
-     * @return string|false القيمة أو false إذا لم توجد
-     */
-    public function getFlash($key)
-    {
-        return $_SESSION[self::FLASH_KEY][$key]['value'] ?? false;
-    }
-
-    /**
-     * حفظ قيمة في الجلسة
-     * 
-     * @param string $key
-     * @param mixed $value
-     */
-    public function set($key, $value)
-    {
+    public function set(string $key, mixed $value): static {
         $_SESSION[$key] = $value;
+        return $this;
     }
 
-    /**
-     * جلب قيمة من الجلسة
-     * 
-     * @param string $key
-     * @return mixed|false
-     */
-    public function get($key)
-    {
-        return $_SESSION[$key] ?? false;
+    public function get(string $key, mixed $default = null): mixed {
+        return $_SESSION[$key] ?? $default;
     }
 
-    /**
-     * حذف قيمة معينة من الجلسة
-     * 
-     * @param string $key
-     */
-    public function remove($key)
-    {
+    public function has(string $key): bool {
+        return isset($_SESSION[$key]);
+    }
+
+    public function remove(string $key): static {
         unset($_SESSION[$key]);
+        return $this;
+    }
+
+    public function all(): array {
+        return $_SESSION;
+    }
+
+    // -------------------------------------------------------------------------
+    //  Flash Messages (persist for ONE subsequent request)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Set a flash message.
+     */
+    public function flash(string $key, mixed $message): static {
+        $_SESSION[self::FLASH_KEY]['new'][$key] = $message;
+        return $this;
     }
 
     /**
-     * تدمير الجلسة بالكامل (تسجيل الخروج)
-     * يقوم بثلاث خطوات أمنية متسلسلة:
-     *  1. تفريغ محتوى $_SESSION من الذاكرة
-     *  2. حذف Cookie الجلسة من متصفح المستخدم
-     *  3. تدمير بيانات الجلسة من السيرفر
+     * Read a flash message from the current request.
      */
-    public function destroy(): void
-    {
-        // الخطوة 1: تفريغ مصفوفة الجلسة في الذاكرة
+    public function getFlash(string $key, mixed $default = null): mixed {
+        return $_SESSION[self::FLASH_KEY]['current'][$key] ?? $default;
+    }
+
+    /**
+     * Check if a flash message exists in the current request.
+     */
+    public function hasFlash(string $key): bool {
+        return isset($_SESSION[self::FLASH_KEY]['current'][$key]);
+    }
+
+    // -------------------------------------------------------------------------
+    //  Regenerate & Destroy
+    // -------------------------------------------------------------------------
+
+    /**
+     * Regenerate the session ID (use after login to prevent session fixation).
+     */
+    public function regenerate(bool $deleteOld = true): static {
+        session_regenerate_id($deleteOld);
+        return $this;
+    }
+
+    /**
+     * Destroy the session completely.
+     */
+    public function destroy(): void {
         $_SESSION = [];
 
-        // الخطوة 2: [أمان] حذف Cookie الجلسة من متصفح المستخدم
-        // بدون هذه الخطوة يظل المتصفح يحتفظ بالـ Cookie ويمكنه إعادة استخدامه
         if (ini_get('session.use_cookies') && isset($_COOKIE[session_name()])) {
-            $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'],
-                $params['domain'],
-                $params['secure'],
-                $params['httponly']
-            );
+            $p = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $p['path'], $p['domain'], $p['secure'], $p['httponly']);
         }
 
-        // الخطوة 3: تدمير بيانات الجلسة من السيرفر
         session_destroy();
     }
 
-    /**
-     * الدالة المدمرة (Destructor)
-     * تنفذ تلقائياً في نهاية الطلب وتقوم بمسح رسائل الفلاش القديمة.
-     */
-    public function __destruct()
-    {
-        $this->removeFlashMessages();
+    // -------------------------------------------------------------------------
+    //  Internal
+    // -------------------------------------------------------------------------
+
+    private function start(): void {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
     }
 
     /**
-     * حذف رسائل الفلاش التي تم وضع علامة 'remove' عليها مسبقاً
+     * Move flash "new" → "current" on every request.
+     * "current" was the previous request's "new", so it's now accessible.
      */
-    private function removeFlashMessages()
-    {
-        $flashMessages = $_SESSION[self::FLASH_KEY] ?? [];
-        foreach ($flashMessages as $key => $flashMessage) {
-            if ($flashMessage['remove']) {
-                unset($flashMessages[$key]);
-            }
-        }
-        $_SESSION[self::FLASH_KEY] = $flashMessages;
+    private function tickFlash(): void {
+        $_SESSION[self::FLASH_KEY]['current'] = $_SESSION[self::FLASH_KEY]['new'] ?? [];
+        $_SESSION[self::FLASH_KEY]['new']     = [];
     }
+
+    public function __destruct() {}
 }

@@ -3,7 +3,6 @@ namespace yurni;
 
 use Reflector;
 use ReflectionClass;
-use ReflectionParameter;
 use ReflectionMethod;
 use ReflectionFunction;
 use yurni\Exception\NotFoundException;

@@ -2,16 +2,16 @@
 namespace yurni\Http;
 
 use yurni\Application;
-use yurni\Router\Router;
 use yurni\Router\Route;
-use yurni\Exception\ForbiddenException;
+
 
 /**
  * كلاس الطلب (Request)
  * يقوم بتجريد (Abstract) جميع معلومات الطلب القادم من المستخدم مثل المدخلات، الملفات المرفوعة، والـ Headers.
  */
-class Request {
-    
+class Request
+{
+
     /**
      * @var Application كائن التطبيق الأساسي
      */
@@ -56,17 +56,19 @@ class Request {
      * @param Route $route
      * @return self
      */
-    public function setRoute(Route $route) {
+    public function setRoute(Route $route)
+    {
         $this->route = $route;
         return $this;
     }
-    
+
     /**
      * الحصول على كائن المسار المطابق الحالي
      * 
      * @return Route
      */
-    public function route() {
+    public function route()
+    {
         return $this->route;
     }
 
@@ -99,7 +101,7 @@ class Request {
     public function getPath()
     {
         $path_info = $this->server("PATH_INFO");
-        if(!$path_info) {
+        if (!$path_info) {
             $request_uri = $this->server('REQUEST_URI');
             if ($request_uri) {
                 $path_info = parse_url($request_uri, PHP_URL_PATH);
@@ -130,7 +132,8 @@ class Request {
      */
     public function multiFiles($key)
     {
-        if(!$this->hasMultiFiles($key)) return array();
+        if (!$this->hasMultiFiles($key))
+            return array();
 
         $input_files = array();
         $files = $this->files[$key];
@@ -141,8 +144,9 @@ class Request {
         $errors = $files["error"];
         $sizes = $files["size"];
 
-        foreach($temps as $i => $tmp) {
-            if(empty($tmp) || !is_uploaded_file($tmp)) continue;
+        foreach ($temps as $i => $tmp) {
+            if (empty($tmp) || !is_uploaded_file($tmp))
+                continue;
 
             $_file = array(
                 'name' => $names[$i],
@@ -167,10 +171,12 @@ class Request {
     public function hasFile($key)
     {
         $file = $this->files[$key] ?? false;
-        if(!$file) return FALSE;
+        if (!$file)
+            return FALSE;
 
         $tmp = $file["tmp_name"];
-        if(!is_string($tmp)) return FALSE;
+        if (!is_string($tmp))
+            return FALSE;
 
         return is_uploaded_file($tmp);
     }
@@ -184,13 +190,16 @@ class Request {
     public function hasMultiFiles($key)
     {
         $files = $this->files[$key] ?? false;
-        if(!$files) return FALSE;
-        
-        $uploaded_files = $files["tmp_name"];
-        if(!is_array($uploaded_files)) return FALSE;
+        if (!$files)
+            return FALSE;
 
-        foreach($uploaded_files as $tmp_file) {
-            if(!empty($tmp_file) && is_uploaded_file($tmp_file)) return TRUE;
+        $uploaded_files = $files["tmp_name"];
+        if (!is_array($uploaded_files))
+            return FALSE;
+
+        foreach ($uploaded_files as $tmp_file) {
+            if (!empty($tmp_file) && is_uploaded_file($tmp_file))
+                return TRUE;
         }
 
         return FALSE;
@@ -218,12 +227,27 @@ class Request {
     }
 
     // التحقق من نوع الطلب
-    public function isPost() { return $this->getMethod() == "post"; }
-    public function isGet() { return $this->getMethod() == "get"; }
-    public function isPut() { return $this->getMethod() == "put"; }
-    public function isPatch() { return $this->getMethod() == "patch"; }
-    public function isDelete() { return $this->getMethod() == "delete"; }
-    
+    public function isPost()
+    {
+        return $this->getMethod() == "post";
+    }
+    public function isGet()
+    {
+        return $this->getMethod() == "get";
+    }
+    public function isPut()
+    {
+        return $this->getMethod() == "put";
+    }
+    public function isPatch()
+    {
+        return $this->getMethod() == "patch";
+    }
+    public function isDelete()
+    {
+        return $this->getMethod() == "delete";
+    }
+
     public function isHttps()
     {
         return $this->server('HTTPS') ? true : false;
@@ -233,7 +257,7 @@ class Request {
     {
         return !$this->isHttps();
     }
-    
+
     public function isAjax()
     {
         return (!empty($this->server('HTTP_X_REQUESTED_WITH')) && strtolower($this->server('HTTP_X_REQUESTED_WITH')) == 'xmlhttprequest');
@@ -262,43 +286,43 @@ class Request {
         }
 
         $body = [];
-        
+
         // معالجة GET
-        if($this->isGet() || isset($_GET)){
-            foreach($_GET as $key => $val){
+        if ($this->isGet() || isset($_GET)) {
+            foreach ($_GET as $key => $val) {
                 $body[$key] = filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS);
             }
         }
-        
+
         // معالجة POST
-        if($this->isPost() || isset($_POST)){
-            foreach($_POST as $key => $val){
+        if ($this->isPost() || isset($_POST)) {
+            foreach ($_POST as $key => $val) {
                 $body[$key] = filter_input(INPUT_POST, $key, FILTER_SANITIZE_SPECIAL_CHARS);
             }
         }
-        
+
         // معالجة الطلبات الأخرى التي تعتمد على JSON أو Urlencoded (PUT, PATCH, DELETE)
-        if($this->isPut() || $this->isDelete() || $this->isPatch()){
+        if ($this->isPut() || $this->isDelete() || $this->isPatch()) {
             $raw_body = $this->body();
             $content_type = $this->server('CONTENT_TYPE') ?: '';
-            
+
             if (strpos($content_type, 'application/json') !== false) {
                 $obj = json_decode($raw_body, true);
                 if ($obj && is_array($obj)) {
-                    foreach($obj as $key => $val){
+                    foreach ($obj as $key => $val) {
                         $body[$key] = $val;
                     }
                 }
             } else {
                 parse_str($raw_body, $parsed_vars);
                 if (is_array($parsed_vars)) {
-                    foreach($parsed_vars as $key => $val){
+                    foreach ($parsed_vars as $key => $val) {
                         $body[$key] = filter_var($val, FILTER_SANITIZE_SPECIAL_CHARS);
                     }
                 }
             }
         }
-        
+
         $this->inputCache = $body;
         return $this->inputCache;
     }

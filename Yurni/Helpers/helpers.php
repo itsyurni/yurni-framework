@@ -3,6 +3,8 @@
 use yurni\Config;
 use yurni\Security\Csrf;
 use yurni\View;
+use yurni\Db;
+use yurni\Http\Session;
 
 if (!function_exists('env')) {
     /**
@@ -60,17 +62,43 @@ if (!function_exists('csrf_token')) {
     }
 }
 
+if (!function_exists('db')) {
+    /**
+     * الحصول على كائن قاعدة البيانات (Db)
+     */
+    function db() {
+        return Db::getInstance();
+    }
+}
+
+if (!function_exists('session')) {
+    /**
+     * جلب أو تعيين قيم الجلسة
+     */
+    function session($key = null, $default = null) {
+        $session = new Session();
+        if (is_null($key)) {
+            return $session;
+        }
+        if (func_num_args() > 1) {
+            $session->set($key, $default);
+            return null;
+        }
+        return $session->get($key) ?? $default;
+    }
+}
+
 if (!function_exists('flash')) {
     /**
      * قراءة أو كتابة رسائل الإشعارات (Flash Messages)
      */
     function flash($key = null, $message = null) {
-        $session = new \yurni\Http\Session();
+        $session = new Session();
         if (is_null($key)) {
             return $session;
         }
         if (!is_null($message)) {
-            $session->setFlash($key, $message);
+            $session->flash($key, $message);
             return null;
         }
         return $session->getFlash($key);
@@ -90,5 +118,14 @@ if (!function_exists('dd')) {
         }
         echo '</div>';
         exit;
+    }
+}
+if (!function_exists('base_path')) {
+    /**
+     * الحصول على المسار الكامل لمجلد المشروع الأساسي أو ملف بداخله
+     */
+    function base_path($path = '') {
+        $base = \yurni\Application::getInstance() ? \yurni\Application::getInstance()->getBasePath() : realpath(__DIR__ . '/../../');
+        return $base . ($path ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : '');
     }
 }

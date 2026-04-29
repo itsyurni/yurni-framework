@@ -4,13 +4,14 @@ namespace yurni\Router;
 use yurni\Application;
 use yurni\Http\Response;
 use yurni\Http\Request;
-use yurni\Exception\NotFoundException;
+
 
 /**
  * كلاس الموجه (Router)
  * مسؤول عن تسجيل ومعالجة الروابط (Routes) وتوجيهها للمتحكمات (Controllers) المناسبة.
  */
-class Router {
+class Router
+{
 
     /**
      * @var Application كائن التطبيق الأساسي
@@ -52,20 +53,20 @@ class Router {
         ':uuid' => '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})',
         ':date' => '([0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[1-2][0-9]|3[0-1]))',
     ];
-    
+
     /**
      * منشئ الكلاس (Constructor)
      * 
      * @param Application $app
      */
-    public function __construct(Application $app) 
+    public function __construct(Application $app)
     {
         $this->app = $app;
         $this->response = $this->app->response;
         $this->request = $this->app->request;
-        
+
         // إعداد استجابة افتراضية في حالة عدم العثور على المسار (404)
-        $this->handle("404", function() {
+        $this->handle("404", function () {
             http_response_code(404);
             echo "<h1>404 Not Found</h1><p>The requested URL was not found on this server.</p>";
         });
@@ -77,20 +78,22 @@ class Router {
      * @param string $type نوع الخطأ
      * @param callable $callback الدالة المراد تنفيذها
      */
-    public function handle($type, $callback) {
+    public function handle($type, $callback)
+    {
         return $this->handle[$type] = $callback;
     }
-    
+
     /**
      * إضافة تعبيرات نمطية مخصصة للروابط
      * 
      * @param array $patterns
      * @return self
      */
-    public function setPattern($patterns) {
-        foreach($patterns as $key => $val){
+    public function setPattern($patterns)
+    {
+        foreach ($patterns as $key => $val) {
             $this->patterns[$key] = $val;
-        } 
+        }
         return $this;
     }
 
@@ -100,7 +103,8 @@ class Router {
      * @param string $type
      * @return mixed
      */
-    public function getHandle($type) {
+    public function getHandle($type)
+    {
         return $this->app->container()->call($this->handle[$type]);
     }
 
@@ -115,12 +119,12 @@ class Router {
     {
         // تهيئة الـ Slashes
         $route = preg_replace("/\\//", "\/", $route);
-        
+
         // تحويل المتغيرات في الرابط مثل {id} لتلتقط قيمتها في مصفوفة المطابقات
-        $route = preg_replace_callback('/\{([a-zA-Z0-9_]+)\}/', function($matches) {
+        $route = preg_replace_callback('/\{([a-zA-Z0-9_]+)\}/', function ($matches) {
             return '(?P<' . $matches[1] . '>[^\/]+)';
         }, $route);
-        
+
         // إغلاق التعبير النمطي
         $route = "/^" . $route . "$/i";
         return $route;
@@ -147,7 +151,7 @@ class Router {
     public function register($method, $uri, $action)
     {
         $routeUri = $this->routeToRegex($uri);
-        $route = new Route($method, $routeUri, $action); 
+        $route = new Route($method, $routeUri, $action);
         $this->routes[] = $route;
         return $route;
     }
@@ -161,14 +165,11 @@ class Router {
      */
     protected function findRoute($path, $method)
     {
-        foreach($this->getRoutes() as $route)
-        {
+        foreach ($this->getRoutes() as $route) {
             // مطابقة الرابط بالتعبير النمطي الخاص بالمسار
-            if(preg_match($route->getUri(), $path, $matches) && in_array($method, $route->getMethod()))
-            {
+            if (preg_match($route->getUri(), $path, $matches) && in_array($method, $route->getMethod())) {
                 // إذا تم العثور على المسار، قم بتخزين المتغيرات الملتقطة داخل كائن المسار
-                foreach($matches as $key => $val)
-                { 
+                foreach ($matches as $key => $val) {
                     if (is_string($key)) {
                         $route->setParam($key, $val);
                     }
@@ -186,16 +187,17 @@ class Router {
      * @param array $args المعاملات الملتقطة من الرابط
      * @return mixed
      */
-    public function resolveCallback($callback, $args) {
+    public function resolveCallback($callback, $args)
+    {
         $output = $this->app->container()->injectArgs($args)->call($callback);
-        
+
         // إذا كان المخرج هو كائن Response بالفعل (مثل دالة redirect)، نرجعه مباشرة
         if ($output instanceof Response) {
             return $output->body();
         }
-        
+
         // التحويل التلقائي للمصفوفات إلى JSON
-        if(is_array($output)) {
+        if (is_array($output)) {
             return $this->response->json($output)->body();
         } else {
             return $this->response->html($output)->body();
@@ -211,12 +213,11 @@ class Router {
     {
         $request_url = $this->request->getPath();
         $request_method = $this->request->getMethod();
-        
+
         // محاولة العثور على المسار المطلوب
         $route = $this->findRoute($request_url, $request_method);
 
-        if($route)
-        {
+        if ($route) {
             // حفظ كائن المسار المكتشف داخل كائن الطلب لتسهيل الوصول إليه
             $this->request->setRoute($route);
 
@@ -236,7 +237,7 @@ class Router {
                     return false;
                 }
             }
-            
+
             // تنفيذ الدالة المسؤولة عن المسار
             return $this->resolveCallback($routeCallback, $routeArgs);
         } else {

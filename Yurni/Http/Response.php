@@ -1,26 +1,25 @@
 <?php
 namespace yurni\Http;
 
-use yurni\Application;
-use yurni\Router\Router;
-
 /**
  * كلاس الاستجابة (Response)
  * مسؤول عن إرسال المخرجات للمستخدم، سواء كانت HTML، JSON، أو حتى عمليات إعادة التوجيه (Redirect).
  */
-class Response  {
-    
+class Response
+{
+
     protected static $CONTENT_TYPE_HTML = "text/html; charset=UTF-8";
     protected static $CONTENT_TYPE_JSON = "application/json; charset=UTF-8";
     protected static $HEADER_CONTENT_TYPE = "Content-Type";
-    
+
     protected array $header;
     protected $body;
-    
+
     /**
      * منشئ الكلاس
      */
-    public function __construct(){
+    public function __construct()
+    {
         $this->body = null;
         $this->reset();
     }
@@ -31,7 +30,8 @@ class Response  {
      * @param int $code
      * @return self
      */
-    public function setStatusCode(int $code){
+    public function setStatusCode(int $code)
+    {
         http_response_code($code);
         return $this;
     }
@@ -41,7 +41,8 @@ class Response  {
      * 
      * @return int|null
      */
-    public function getStatusCode(){
+    public function getStatusCode()
+    {
         return http_response_code() ?? null;
     }
 
@@ -52,7 +53,8 @@ class Response  {
      * @param string $val القيمة
      * @return self
      */
-    public function setHeader($type, $val){
+    public function setHeader($type, $val)
+    {
         header($type . ': ' . $val);
         return $this;
     }
@@ -80,7 +82,7 @@ class Response  {
         $json = json_encode($data);
         $this->body = $json;
         $this->setContentType(self::$CONTENT_TYPE_JSON)
-             ->setStatusCode($status);
+            ->setStatusCode($status);
         return $this;
     }
 
@@ -89,7 +91,8 @@ class Response  {
      * 
      * @return string|null
      */
-    public function body(){
+    public function body()
+    {
         return $this->body;
     }
 
@@ -99,7 +102,8 @@ class Response  {
      * @param string $body
      * @return self
      */
-    public function setBody($body){
+    public function setBody($body)
+    {
         $this->body = $body;
         return $this;
     }
@@ -114,7 +118,7 @@ class Response  {
     public function html($content = "", int $status = 200)
     {
         $this->setStatusCode($status)
-             ->setContentType(self::$CONTENT_TYPE_HTML);
+            ->setContentType(self::$CONTENT_TYPE_HTML);
         $this->body = $content;
         return $this;
     }
@@ -129,13 +133,14 @@ class Response  {
     {
         return $this->setHeader("Location", $url);
     }
-    
+
     /**
      * مسح المحتوى الحالي وتفريغ كائن الاستجابة
      * 
      * @return self
      */
-    public function reset(){
+    public function reset()
+    {
         $this->body = null;
         return $this;
     }

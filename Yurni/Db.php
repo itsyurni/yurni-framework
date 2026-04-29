@@ -37,47 +37,87 @@ class Db
     //  Singleton & PDO
     // =========================================================================
 
-    /** @var self|null النسخة الوحيدة المحفوظة */
+    /** @var self|null Singleton instance */
     private static ?self $instance = null;
 
-    /** @var PDO كائن الـ PDO الخام */
-    private PDO $pdo;
+    /** @var PDO|null Lazy-initialized PDO connection */
+    private ?PDO $pdo = null;
 
     // =========================================================================
     //  Query Log
     // =========================================================================
 
-    /** @var bool تفعيل / تعطيل سجل الاستعلامات */
-    private bool $loggingEnabled = false;
-
-    /** @var array<int, array{sql: string, bindings: array, time_ms: float}> */
-    private array $queryLog = [];
+    private bool  $loggingEnabled = false;
+    private array $queryLog       = [];
 
     // =========================================================================
     //  Constructor (Private — Singleton)
     // =========================================================================
 
     /**
-     * منشئ خاص: ينشئ اتصال PDO مع جميع الإعدادات المثلى.
-     *
-     * @throws DatabaseException إذا فشل الاتصال
+     * Private constructor — connection is NOT made here.
+     * The actual PDO connection is created lazily on the first query.
      */
-    private function __construct()
-    {
-        $host = Config::get('db_host', '127.0.0.1');
-        $port = Config::get('db_port', '3306');
-        $dbname = Config::get('db_name', '');
-        $user = Config::get('db_user', 'root');
-        $pass = Config::get('db_pass', '');
-        $charset = Config::get('db_charset', 'utf8mb4');
+    private function __construct() {}
+
+    // =========================================================================
+    //  Singleton Access
+    // =========================================================================
+
+    public static function getInstance(): static {
+        if (self::$instance === null) {
+            self::$instance = new static();
+        }
+        return self::$instance;
+    }
+
+    public static function reset(): void {
+        self::$instance = null;
+    }
+
+    // =========================================================================
+    //  PDO — Lazy Connection
+    // =========================================================================
+
+    /**
+     * Returns the PDO connection, connecting on first call.
+     *
+     * @throws DatabaseException if connection fails
+     */
+    public function getPdo(): PDO {
+        if ($this->pdo === null) {
+            $this->connect();
+        }
+        return $this->pdo;
+    }
+
+    /**
+     * Check if a database is configured and reachable without throwing.
+     */
+    public function isConnected(): bool {
+        try {
+            $this->getPdo();
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private function connect(): void {
+        $host     = Config::get('db_host',      '127.0.0.1');
+        $port     = Config::get('db_port',      '3306');
+        $dbname   = Config::get('db_name',      '');
+        $user     = Config::get('db_user',      'root');
+        $pass     = Config::get('db_pass',      '');
+        $charset  = Config::get('db_charset',   'utf8mb4');
 
         $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
 
         $options = [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES => false,
-            PDO::ATTR_PERSISTENT => false,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+            PDO::ATTR_PERSISTENT         => false,
             PDO::MYSQL_ATTR_INIT_COMMAND =>
                 "SET NAMES {$charset} COLLATE " . Config::get('db_collation', 'utf8mb4_unicode_ci') .
                 ", time_zone = '" . Config::get('db_timezone', '+00:00') . "'",
@@ -86,52 +126,13 @@ class Db
         try {
             $this->pdo = new PDO($dsn, $user, $pass, $options);
         } catch (PDOException $e) {
-            error_log('[Yurni\\Db] Connection failed: ' . $e->getMessage());
+            error_log('[Yurni\Db] Connection failed: ' . $e->getMessage());
             throw new DatabaseException(
-                'Database connection failed. Please check your configuration.',
+                'Database connection failed. Please check your .env configuration.',
                 (int) $e->getCode(),
                 $e
             );
         }
-    }
-
-    // =========================================================================
-    //  Singleton Access
-    // =========================================================================
-
-    /**
-     * الحصول على النسخة الوحيدة من كائن Db.
-     *
-     * @return static
-     */
-    public static function getInstance(): static
-    {
-        if (self::$instance === null) {
-            self::$instance = new static();
-        }
-        return self::$instance;
-    }
-
-    /**
-     * إعادة تعيين الـ Singleton (مفيد في الاختبارات الآلية).
-     */
-    public static function reset(): void
-    {
-        self::$instance = null;
-    }
-
-    // =========================================================================
-    //  PDO Raw Access
-    // =========================================================================
-
-    /**
-     * الحصول على كائن PDO الأصلي مباشرةً.
-     *
-     * @return PDO
-     */
-    public function getPdo(): PDO
-    {
-        return $this->pdo;
     }
 
     public function query(): QueryBuilder
@@ -162,7 +163,7 @@ class Db
         $start = microtime(true);
 
         try {
-            $stmt = $this->pdo->prepare($sql);
+            $stmt = $this->getPdo()->prepare($sql);
             foreach ($bindings as $key => $value) {
                 $param = is_int($key) ? $key + 1 : (str_starts_with((string) $key, ':') ? (string) $key : ':' . $key);
                 $stmt->bindValue($param, $value, $this->detectPdoParamType($value));
@@ -227,7 +228,7 @@ class Db
     public function insertGetId(string $sql, array $bindings = []): int
     {
         $this->statement($sql, $bindings);
-        return (int) $this->pdo->lastInsertId();
+        return (int) $this->getPdo()->lastInsertId();
     }
 
     /**
@@ -241,7 +242,7 @@ class Db
     {
         $start = microtime(true);
         try {
-            $rows = $this->pdo->exec($sql);
+            $rows = $this->getPdo()->exec($sql);
         } catch (PDOException $e) {
             error_log("[Yurni\\Db] Unprepared query failed: {$sql}");
             throw new QueryException($sql, [], $e);
@@ -262,8 +263,8 @@ class Db
      */
     public function beginTransaction(): void
     {
-        if (!$this->pdo->inTransaction()) {
-            $this->pdo->beginTransaction();
+        if (!$this->getPdo()->inTransaction()) {
+            $this->getPdo()->beginTransaction();
         }
     }
 
@@ -272,8 +273,8 @@ class Db
      */
     public function commit(): void
     {
-        if ($this->pdo->inTransaction()) {
-            $this->pdo->commit();
+        if ($this->getPdo()->inTransaction()) {
+            $this->getPdo()->commit();
         }
     }
 
@@ -282,8 +283,8 @@ class Db
      */
     public function rollback(): void
     {
-        if ($this->pdo->inTransaction()) {
-            $this->pdo->rollBack();
+        if ($this->getPdo()->inTransaction()) {
+            $this->getPdo()->rollBack();
         }
     }
 
@@ -313,7 +314,7 @@ class Db
      */
     public function inTransaction(): bool
     {
-        return $this->pdo->inTransaction();
+        return $this->getPdo()->inTransaction();
     }
 
     // =========================================================================
