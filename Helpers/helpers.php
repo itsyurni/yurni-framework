@@ -125,7 +125,8 @@ if (!function_exists('base_path')) {
      * الحصول على المسار الكامل لمجلد المشروع الأساسي أو ملف بداخله
      */
     function base_path($path = '') {
-        $base = \yurni\Application::getInstance() ? \yurni\Application::getInstance()->getBasePath() : realpath(__DIR__ . '/../../');
+        $base = \yurni\Application::getInstance() ? \yurni\Application::getInstance()->getBasePath() : realpath(__DIR__ . '/../');
         return $base . ($path ? DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : '');
     }
+
 }

@@ -62,7 +62,8 @@ class Application
     {
         self::$instance = $this;
         // تحديد المسار الأساسي للمشروع
-        $this->basePath = $basePath ?: realpath(__DIR__ . '/../');
+        $this->basePath = $basePath ?: realpath(__DIR__);
+
 
         // تشغيل الجلسة مرة واحدة فقط في دورة حياة الطلب
         if (session_status() === PHP_SESSION_NONE) {
