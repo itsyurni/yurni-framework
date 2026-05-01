@@ -94,6 +94,30 @@ class Request
     }
 
     /**
+     * الحصول على قيمة من الـ Headers
+     * 
+     * @param string $key اسم الـ Header
+     * @param mixed $default القيمة الافتراضية
+     * @return mixed
+     */
+    public function header(string $key, $default = null)
+    {
+        $headerKey = str_replace('-', '_', strtoupper($key));
+        
+        // التحقق من الصيغة القياسية (HTTP_NAME)
+        if (isset($this->_server['HTTP_' . $headerKey])) {
+            return $this->_server['HTTP_' . $headerKey];
+        }
+        
+        // التحقق من الحالات الخاصة مثل CONTENT_TYPE و CONTENT_LENGTH
+        if (isset($this->_server[$headerKey])) {
+            return $this->_server[$headerKey];
+        }
+
+        return $default;
+    }
+
+    /**
      * الحصول على مسار الطلب (Path) بعد تنظيفه وإزالة المتغيرات (Query Strings)
      * 
      * @return string المسار الحالي (مثال: /home)
@@ -295,16 +319,16 @@ class Request
         }
 
         // معالجة POST
-        if ($this->isPost() || isset($_POST)) {
+        if ($this->isPost()) {
             foreach ($_POST as $key => $val) {
                 $body[$key] = filter_input(INPUT_POST, $key, FILTER_SANITIZE_SPECIAL_CHARS);
             }
         }
 
-        // معالجة الطلبات الأخرى التي تعتمد على JSON أو Urlencoded (PUT, PATCH, DELETE)
-        if ($this->isPut() || $this->isDelete() || $this->isPatch()) {
+        // معالجة الطلبات التي تعتمد على JSON أو البيانات الخام (POST, PUT, PATCH, DELETE)
+        if ($this->isPost() || $this->isPut() || $this->isDelete() || $this->isPatch()) {
             $raw_body = $this->body();
-            $content_type = $this->server('CONTENT_TYPE') ?: '';
+            $content_type = $this->header('Content-Type') ?: '';
 
             if (strpos($content_type, 'application/json') !== false) {
                 $obj = json_decode($raw_body, true);
@@ -313,7 +337,8 @@ class Request
                         $body[$key] = $val;
                     }
                 }
-            } else {
+            } elseif (!$this->isPost()) {
+                // للطلبات غير الـ POST وغير الـ JSON (مثل PUT urlencoded)
                 parse_str($raw_body, $parsed_vars);
                 if (is_array($parsed_vars)) {
                     foreach ($parsed_vars as $key => $val) {
@@ -364,8 +389,26 @@ class Request
      * @param string $key
      * @return string
      */
+    /**
+     * تنقية قيمة إدخال كنص وإزالة الخصائص الخاصة لمنع XSS
+     * 
+     * @param string $key
+     * @return string
+     */
     public function sanitizeString($key)
     {
         return htmlspecialchars((string) $this->input($key), ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * الحصول على توكن CSRF من الطلب (Input أو Headers)
+     * 
+     * @return string|null
+     */
+    public function csrfToken()
+    {
+        return $this->input('csrf_token') 
+            ?: $this->header('X-CSRF-TOKEN') 
+            ?: $this->header('X-XSRF-TOKEN');
     }
 }

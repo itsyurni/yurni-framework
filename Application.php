@@ -48,6 +48,8 @@ class Application
      */
     protected array $viewAttr = [];
 
+
+
     /**
      * @var Container|null نسخة Singleton من حاوية الـ DI لإعادة استخدامها
      */
@@ -76,6 +78,9 @@ class Application
         $this->router   = new Router($this);
         $this->loadEnv();
         $this->loadViewAttr();
+
+        // تسجيل CSRF كـ Middleware جاهز للاستخدام الاختياري
+        $this->setMiddleware('csrf', \yurni\Security\Csrf::class);
     }
 
     /**
@@ -119,7 +124,8 @@ class Application
         } elseif (file_exists($envFile)) {
             $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
             foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0) continue;
+                if (strpos(trim($line), '#') === 0)
+                    continue;
                 if (strpos($line, '=') !== false) {
                     [$name, $value] = explode('=', $line, 2);
                     $_ENV[trim($name)] = trim($value);
@@ -135,7 +141,7 @@ class Application
     private function loadViewAttr(): void
     {
         $this->viewAttr = [
-            'app'        => $this,
+            'app' => $this,
             'appRequest' => $this->request,
             'appResponse' => $this->response,
         ];
@@ -178,15 +184,25 @@ class Application
 
     /**
      * تنفيذ والحصول على الـ Middleware المطلوب
+     * يدعم: Closure, [Class, method], Class::class (invokable)
      *
      * @param string $name اسم الـ Middleware
      * @return mixed
      */
     public function getMiddleware(string $name): mixed
     {
-        return $this->hasMiddleware($name)
-            ? $this->container()->call($this->middlewares[$name])
-            : false;
+        if (!$this->hasMiddleware($name)) {
+            return false;
+        }
+
+        $middleware = $this->middlewares[$name];
+
+        // إذا كان string (class name) نحوله لكائن قابل للاستدعاء __invoke
+        if (is_string($middleware) && class_exists($middleware)) {
+            $middleware = [new $middleware(), '__invoke'];
+        }
+
+        return $this->container()->call($middleware);
     }
 
     /**
@@ -213,9 +229,9 @@ class Application
 
             // تسجيل الكائنات كـ Singletons لمنع إعادة إنشائها
             $this->containerInstance->instance(get_class($this->response), $this->response);
-            $this->containerInstance->instance(get_class($this->request),  $this->request);
-            $this->containerInstance->instance(get_class($this),           $this);
-            $this->containerInstance->instance(Db::class,                  Db::getInstance());
+            $this->containerInstance->instance(get_class($this->request), $this->request);
+            $this->containerInstance->instance(get_class($this), $this);
+            $this->containerInstance->instance(Db::class, Db::getInstance());
             $this->containerInstance->bind(
                 QueryBuilder::class,
                 static fn(Container $c): QueryBuilder => Db::getInstance()->query()
@@ -224,12 +240,12 @@ class Application
             // حقن بأسماء مختصرة لدعم الـ Closures بدون Type Hinting
             $this->containerInstance->injectArgs([
                 get_class($this->response) => $this->response,
-                get_class($this->request)  => $this->request,
-                get_class($this)           => $this,
-                Db::class                  => Db::getInstance(),
-                'app'                      => $this,
-                'request'                  => $this->request,
-                'response'                 => $this->response,
+                get_class($this->request) => $this->request,
+                get_class($this) => $this,
+                Db::class => Db::getInstance(),
+                'app' => $this,
+                'request' => $this->request,
+                'response' => $this->response,
             ]);
         }
 
@@ -384,15 +400,6 @@ class Application
     {
         try {
             // التحقق من توكن CSRF تلقائياً لطلبات POST, PUT, DELETE, PATCH
-            if (in_array($this->request->getMethod(), ['post', 'put', 'delete', 'patch'])) {
-                $token = $this->request->input('csrf_token');
-                if (!\yurni\Security\Csrf::validateToken($token)) {
-                    http_response_code(403);
-                    echo '<h1>403 Forbidden</h1><p>CSRF token validation failed.</p>';
-                    return;
-                }
-            }
-
             // حل المسار وطباعة المخرجات النهائية
             echo $this->router->resolve();
         } catch (\Throwable $e) {

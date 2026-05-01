@@ -1,6 +1,10 @@
-# 📖 دليل استخدام Yurni Framework
+# Yurni Framework 
+
+[English](#english) | [العربية](#العربية)
 
 ---
+
+# 📖 دليل استخدام Yurni Framework
 
 ## 1. 🚀 الإعداد الأولي (Bootstrap)
 
@@ -16,6 +20,16 @@ DB_PASS=secret
 DB_CHARSET=utf8mb4
 ```
 
+###  Features
+- **Intuitive Routing**: Define clean and expressive routes easily.
+- **MVC Architecture**: Clean separation of concerns with Models, Views, and Controllers.
+- **Dependency Injection**: Powerful DI Container for managing object lifecycles.
+- **Query Builder**: Fluent and secure database interaction layer.
+- **Middleware Support**: Intercept and process requests with ease.
+- **Security First**: Built-in protection against CSRF and common vulnerabilities.
+- **Template Engine**: Dynamic view rendering with clean syntax.
+
+###  Quick Start
 ### ملف `index.php` (نقطة الدخول)
 ```php
 <?php
@@ -32,6 +46,26 @@ $app->get('/', function () {
 
 $app->run();
 ```
+
+###  Installation / إعداد بيئة العمل
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/itsyurni/yurni-framework.git
+   ```
+2. **Install dependencies**:
+   ```bash
+   composer install
+   ```
+3. **Setup environment**:
+   Copy the example environment file and configure your database settings:
+   ```bash
+   cp .env.example .env
+   ```
+4. **Run the application**:
+   Use the PHP built-in server to start:
+   ```bash
+   php -S localhost:8000 -t public
+   ```
 
 ### ملف `composer.json`
 ```json
@@ -170,6 +204,22 @@ class UserController extends Controller
     }
 }
 ```
+
+###  المميزات
+- **نظام توجيه مرن (Routing)**: تعريف مسارات نظيفة ومعبرة بسهولة.
+- **بنية MVC**: فصل كامل للمنطق (Logic) عن العرض (Presentation).
+- **حاوية حقن التبعيات (DI Container)**: إدارة دورة حياة الكائنات بكفاءة.
+- **منشئ الاستعلامات (Query Builder)**: تعامل سلس وآمن مع قواعد البيانات.
+- **دعم البرمجيات الوسيطة (Middlewares)**: معالجة الطلبات قبل وصولها للمتحكم.
+- **حماية مدمجة**: حماية تلقائية ضد هجمات CSRF والثغرات الشائعة.
+- **محرك قوالب**: نظام عرض ديناميكي وبسيط.
+
+###  متطلبات التشغيل
+قبل البدء، تأكد من توفر المتطلبات التالية في بيئتك:
+- **PHP**: إصدار 8.0 أو أعلى.
+- **Composer**: لإدارة المكتبات والاعتمادات.
+- **خادم ويب**: مثل Apache أو Nginx، أو استخدام خادم PHP المدمج للتطوير.
+- **قاعدة بيانات**: (اختياري) MySQL أو SQLite.
 
 ---
 
@@ -735,22 +785,6 @@ class PostController extends Controller
         ]);
 
         flash('success', 'تم نشر المقال!');
-        return $this->response->redirect('/posts');
-    }
-
-    public function update(Request $request, $id)
-    {
-        $this->table('posts')->where('id', $id)->update([
-            'title' => $request->sanitizeString('title'),
-            'body'  => $request->input('body'),
-        ]);
-
-        return $this->response->redirect("/posts/$id");
-    }
-
-    public function destroy($id)
-    {
-        $this->table('posts')->where('id', $id)->delete();
         return $this->response->redirect('/posts');
     }
 }

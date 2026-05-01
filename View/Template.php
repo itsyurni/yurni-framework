@@ -7,27 +7,30 @@ namespace yurni\View;
  * Compiles template files into executable PHP code.
  * Supports: inheritance, blocks, conditions, loops, echoing, verbatim, and raw PHP.
  */
-class Template {
+class Template
+{
 
-    private array  $blocks        = [];
-    private array  $verbatimBlocks = [];
+    private array $blocks = [];
+    private array $verbatimBlocks = [];
     private string $temp_path;
     private string $cache_path;
-    private bool   $cache_enabled;
-    private bool   $optimize;
+    private bool $cache_enabled;
+    private bool $optimize;
 
-    public function __construct(array $data = []) {
-        $this->temp_path    = rtrim($data['temp_path'],  '/\\') . DIRECTORY_SEPARATOR;
-        $this->cache_path   = rtrim($data['cache_path'], '/\\') . DIRECTORY_SEPARATOR;
-        $this->cache_enabled = $data['cache']    ?? false;
-        $this->optimize      = $data['optimize'] ?? false;
+    public function __construct(array $data = [])
+    {
+        $this->temp_path = rtrim($data['temp_path'], '/\\') . DIRECTORY_SEPARATOR;
+        $this->cache_path = rtrim($data['cache_path'], '/\\') . DIRECTORY_SEPARATOR;
+        $this->cache_enabled = $data['cache'] ?? false;
+        $this->optimize = $data['optimize'] ?? false;
     }
 
     // =========================================================================
     //  Public API
     // =========================================================================
 
-    public function render(string $file, array $params = []): string {
+    public function render(string $file, array $params = []): string
+    {
         $this->blocks = [];
 
         $cached_file = $this->cache($file);
@@ -39,7 +42,8 @@ class Template {
         return ob_get_clean();
     }
 
-    public function clearCache(): void {
+    public function clearCache(): void
+    {
         foreach (glob($this->cache_path . '*.php') as $file) {
             unlink($file);
         }
@@ -49,14 +53,15 @@ class Template {
     //  Caching
     // =========================================================================
 
-    public function cache(string $file): string {
+    public function cache(string $file): string
+    {
         if (!is_dir($this->cache_path)) {
             mkdir($this->cache_path, 0744, true);
         }
 
         $file_with_ext = $this->ensureExtension($file);
-        $source_file   = $this->temp_path . $file_with_ext;
-        $cached_file   = $this->cache_path . md5($source_file) . '.php';
+        $source_file = $this->temp_path . $file_with_ext;
+        $cached_file = $this->cache_path . md5($source_file) . '.php';
 
         $needsCompile = !$this->cache_enabled
             || !file_exists($cached_file)
@@ -84,7 +89,8 @@ class Template {
     //  File Inclusion & Inheritance
     // =========================================================================
 
-    public function includeFile(string $file): string {
+    public function includeFile(string $file): string
+    {
         $file = trim($file, "'\"");
         $file_with_ext = $this->ensureExtension($file);
 
@@ -116,7 +122,8 @@ class Template {
     //  Compiler Pipeline
     // =========================================================================
 
-    public function compile(string $output): string {
+    public function compile(string $output): string
+    {
         $output = $this->compileVerbatim($output);
         $output = $this->compileBlock($output);
         $output = $this->compileYield($output);
@@ -132,7 +139,8 @@ class Template {
     //  Conditions  {% if %} / {% elseif %} / {% else %} / {% endif %}
     // =========================================================================
 
-    private function compileConditions(string $output): string {
+    private function compileConditions(string $output): string
+    {
         // {% if (expr) %}
         $output = preg_replace(
             '/\{%\s*if\s*(.+?)\s*%\}/is',
@@ -186,7 +194,8 @@ class Template {
     //  Loops  {% for %} / {% foreach %} / {% while %} / {% each %}
     // =========================================================================
 
-    private function compileLoops(string $output): string {
+    private function compileLoops(string $output): string
+    {
         // {% foreach $arr as $item %}  ...  {% endforeach %}
         $output = preg_replace(
             '/\{%\s*foreach\s*(.+?)\s+as\s+(.+?)\s*%\}/is',
@@ -226,7 +235,8 @@ class Template {
     //  Echo Directives
     // =========================================================================
 
-    private function compileEcho(string $output): string {
+    private function compileEcho(string $output): string
+    {
         // {{{ var }}}  → htmlspecialchars (safe / escaped)
         $output = preg_replace(
             '/\{{{\s*(.+?)\s*\}}}/is',
@@ -248,7 +258,8 @@ class Template {
     //  Raw PHP  {% ... %}
     // =========================================================================
 
-    private function compileRawPhp(string $output): string {
+    private function compileRawPhp(string $output): string
+    {
         return preg_replace('/\{%\s*(.+?)\s*%\}/is', '<?php $1 ?>', $output);
     }
 
@@ -256,15 +267,18 @@ class Template {
     //  Block & Yield
     // =========================================================================
 
-    public function compileBlock(string $code): string {
-        if (preg_match_all(
-            '/\{%\s*block\s+(?P<blockName>\S+?)\s*%\}(?P<blockContent>.*?)\{%\s*endblock\s*%\}/is',
-            $code,
-            $matches,
-            PREG_SET_ORDER
-        )) {
+    public function compileBlock(string $code): string
+    {
+        if (
+            preg_match_all(
+                '/\{%\s*block\s+(?P<blockName>\S+?)\s*%\}(?P<blockContent>.*?)\{%\s*endblock\s*%\}/is',
+                $code,
+                $matches,
+                PREG_SET_ORDER
+            )
+        ) {
             foreach ($matches as $value) {
-                $name    = $value['blockName'];
+                $name = $value['blockName'];
                 $content = $value['blockContent'];
 
                 if (!isset($this->blocks[$name])) {
@@ -282,7 +296,8 @@ class Template {
         return $code;
     }
 
-    public function compileYield(string $code): string {
+    public function compileYield(string $code): string
+    {
         foreach ($this->blocks as $block => $value) {
             $code = preg_replace('/\{%\s*yield\s+' . preg_quote($block, '/') . '\s*%\}/', $value, $code);
         }
@@ -294,7 +309,8 @@ class Template {
     //  Verbatim  {% verbatim %} ... {% endverbatim %}
     // =========================================================================
 
-    private function compileVerbatim(string $code): string {
+    private function compileVerbatim(string $code): string
+    {
         $this->verbatimBlocks = [];
 
         return preg_replace_callback(
@@ -308,7 +324,8 @@ class Template {
         );
     }
 
-    private function restoreVerbatim(string $code): string {
+    private function restoreVerbatim(string $code): string
+    {
         foreach ($this->verbatimBlocks as $placeholder => $content) {
             $code = str_replace($placeholder, $content, $code);
         }
@@ -319,11 +336,13 @@ class Template {
     //  Helpers
     // =========================================================================
 
-    private function ensureExtension(string $file): string {
+    private function ensureExtension(string $file): string
+    {
         return str_ends_with($file, '.php') ? $file : $file . '.php';
     }
 
-    private function minify(string $code): string {
+    private function minify(string $code): string
+    {
         $preserved = [];
 
         $code = preg_replace_callback(
