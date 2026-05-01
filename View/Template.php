@@ -237,17 +237,18 @@ class Template
 
     private function compileEcho(string $output): string
     {
-        // {{{ var }}}  → htmlspecialchars (safe / escaped)
+        // {{{ var }}}  → raw echo (بدون escape — استخدم بحذر، للـ HTML الموثوق فقط)
         $output = preg_replace(
             '/\{{{\s*(.+?)\s*\}}}/is',
-            "<?php echo htmlspecialchars((string)($1), ENT_QUOTES, 'UTF-8'); ?>",
+            '<?php echo $1; ?>',
             $output
         );
 
-        // {{ var }}  → raw echo
+        // {{ var }}  → htmlspecialchars (escaped — الافتراضي الآمن)
+        // هذا هو سلوك Blade و Twig: {{ }} آمن دائماً
         $output = preg_replace(
             '/\{{\s*(.+?)\s*\}}/is',
-            '<?php echo $1; ?>',
+            "<?php echo htmlspecialchars((string)($1), ENT_QUOTES, 'UTF-8'); ?>",
             $output
         );
 

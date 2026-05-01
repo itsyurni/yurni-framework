@@ -181,38 +181,49 @@ class Route
     // HTTP Method Helpers
     // -------------------------------------------------------------------------
 
+    /**
+     * التحقق مما إذا كان المسار يدعم طريقة طلب معينة
+     * 
+     * @param string $method
+     * @return bool
+     */
+    public function hasMethod(string $method): bool
+    {
+        return in_array(strtolower($method), (array) $this->method, true);
+    }
+
     public function isGet(): bool
     {
-        return in_array('get', (array) $this->method, true);
+        return $this->hasMethod('get');
     }
 
     public function isPost(): bool
     {
-        return in_array('post', (array) $this->method, true);
+        return $this->hasMethod('post');
     }
 
     public function isPut(): bool
     {
-        return in_array('put', (array) $this->method, true);
+        return $this->hasMethod('put');
     }
 
     public function isPatch(): bool
     {
-        return in_array('patch', (array) $this->method, true);
+        return $this->hasMethod('patch');
     }
 
     public function isDelete(): bool
     {
-        return in_array('delete', (array) $this->method, true);
+        return $this->hasMethod('delete');
     }
 
     public function isAny(): bool
     {
-        return in_array('any', (array) $this->method, true);
+        return $this->hasMethod('any');
     }
 
     public function isOnly(): bool
     {
-        return in_array('only', (array) $this->method, true);
+        return $this->hasMethod('only');
     }
 }

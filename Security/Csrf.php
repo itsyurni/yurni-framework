@@ -34,6 +34,16 @@ class Csrf
     // -------------------------------------------------------------------------
 
     /**
+     * التأكد من بدء الجلسة قبل التعامل معها
+     */
+    private static function ensureSessionStarted(): void
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+    }
+
+    /**
      * توليد رمز (Token) CSRF جديد وتخزينه في الجلسة
      * يُولَّد مرة واحدة فقط لكل جلسة
      *
@@ -41,9 +51,7 @@ class Csrf
      */
     public static function generateToken(): string
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        self::ensureSessionStarted();
 
         if (empty($_SESSION['csrf_token'])) {
             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -59,9 +67,7 @@ class Csrf
      */
     public static function refreshToken(): string
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        self::ensureSessionStarted();
 
         $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         return $_SESSION['csrf_token'];
@@ -76,9 +82,7 @@ class Csrf
      */
     public static function validateToken(?string $token): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        self::ensureSessionStarted();
 
         if (empty($_SESSION['csrf_token']) || empty($token)) {
             return false;

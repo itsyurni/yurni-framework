@@ -47,8 +47,8 @@ class Db
     //  Query Log
     // =========================================================================
 
-    private bool  $loggingEnabled = false;
-    private array $queryLog       = [];
+    private bool $loggingEnabled = false;
+    private array $queryLog = [];
 
     // =========================================================================
     //  Constructor (Private — Singleton)
@@ -58,20 +58,24 @@ class Db
      * Private constructor — connection is NOT made here.
      * The actual PDO connection is created lazily on the first query.
      */
-    private function __construct() {}
+    private function __construct()
+    {
+    }
 
     // =========================================================================
     //  Singleton Access
     // =========================================================================
 
-    public static function getInstance(): static {
+    public static function getInstance(): static
+    {
         if (self::$instance === null) {
             self::$instance = new static();
         }
         return self::$instance;
     }
 
-    public static function reset(): void {
+    public static function reset(): void
+    {
         self::$instance = null;
     }
 
@@ -84,7 +88,8 @@ class Db
      *
      * @throws DatabaseException if connection fails
      */
-    public function getPdo(): PDO {
+    public function getPdo(): PDO
+    {
         if ($this->pdo === null) {
             $this->connect();
         }
@@ -94,7 +99,8 @@ class Db
     /**
      * Check if a database is configured and reachable without throwing.
      */
-    public function isConnected(): bool {
+    public function isConnected(): bool
+    {
         try {
             $this->getPdo();
             return true;
@@ -103,28 +109,61 @@ class Db
         }
     }
 
-    private function connect(): void {
-        $host     = Config::get('db_host',      '127.0.0.1');
-        $port     = Config::get('db_port',      '3306');
-        $dbname   = Config::get('db_name',      '');
-        $user     = Config::get('db_user',      'root');
-        $pass     = Config::get('db_pass',      '');
-        $charset  = Config::get('db_charset',   'utf8mb4');
+    private function connect(): void
+    {
+        // Config keys تطابق ما هو موثق في README:
+        // DB_DRIVER / DB_HOST / DB_NAME / DB_USER / DB_PASS
+        // Config::get() تحوّل المفتاح إلى lowercase داخلياً.
+        $driver = strtolower(Config::get('db_driver', 'mysql'));
+        $host = Config::get('db_host', '127.0.0.1');
+        $port = Config::get('db_port', $driver === 'pgsql' ? '5432' : '3306');
+        $dbname = Config::get('db_name', '');
+        $user = Config::get('db_user', 'root');
+        $pass = Config::get('db_pass', '');
+        $charset = Config::get('db_charset', 'utf8mb4');
 
-        $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}";
+        [$dsn, $options] = match ($driver) {
 
-        $options = [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-            PDO::ATTR_PERSISTENT         => false,
-            PDO::MYSQL_ATTR_INIT_COMMAND =>
-                "SET NAMES {$charset} COLLATE " . Config::get('db_collation', 'utf8mb4_unicode_ci') .
-                ", time_zone = '" . Config::get('db_timezone', '+00:00') . "'",
-        ];
+            // ── SQLite ──────────────────────────────────────────────────────
+            // DB_NAME يُستخدم كمسار للملف، أو ':memory:' للاختبار.
+            'sqlite' => [
+                "sqlite:{$dbname}",
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ],
+            ],
+
+            // ── PostgreSQL ──────────────────────────────────────────────────
+            'pgsql' => [
+                "pgsql:host={$host};port={$port};dbname={$dbname}",
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                ],
+            ],
+
+            // ── MySQL / MariaDB (الافتراضي) ─────────────────────────────────
+            default => [
+                "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}",
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_PERSISTENT => false,
+                    PDO::MYSQL_ATTR_INIT_COMMAND =>
+                        "SET NAMES {$charset} COLLATE "
+                        . Config::get('db_collation', 'utf8mb4_unicode_ci')
+                        . ", time_zone = '"
+                        . Config::get('db_timezone', '+00:00') . "'",
+                ],
+            ],
+        };
 
         try {
-            $this->pdo = new PDO($dsn, $user, $pass, $options);
+            $this->pdo = new PDO($dsn, $driver === 'sqlite' ? null : $user, $driver === 'sqlite' ? null : $pass, $options);
         } catch (PDOException $e) {
             error_log('[Yurni\Db] Connection failed: ' . $e->getMessage());
             throw new DatabaseException(

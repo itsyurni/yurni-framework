@@ -60,107 +60,124 @@ class Container implements ContainerInterface
     /**
      * استخراج وتوليد المعاملات المطلوبة لدالة أو كلاس معين
      * بناءً على الـ Type Hinting باستخدام الـ Reflection
-     * 
-     * @param Reflector $reflection كائن Reflection
-     * @return array مصفوفة المعاملات الجاهزة للحقن
      */
     public function generateArgs(\Reflector $reflection)
     {
         $parameters = [];
-
-        if ($reflection instanceof \ReflectionFunctionAbstract) {
-            $reflect = $reflection;
-        } elseif ($reflection instanceof \ReflectionClass) {
-            $reflect = $reflection->getConstructor();
-        } else {
-            return $parameters;
-        }
+        $reflect = $this->getReflectionSignature($reflection);
 
         if (!$reflect) {
             return $parameters;
         }
 
-        foreach ($reflect->getParameters() as $key => $param) {
-            if ($param->getType() && !$param->getType()->isBuiltin()) {
-                $class = new ReflectionClass($param->getType()->getName());
-            } else {
-                $class = null;
-            }
-
-            if (!is_null($class) && array_key_exists($class->getName(), $this->args)) {
-                $parameters[] = $this->args[$class->getName()];
-            } else if (!is_null($class)) {
-                $cl = $class->getName();
-                try {
-                    $parameters[] = $this->get($cl);
-                } catch (\Exception $e) {
-                    if ($param->isOptional()) {
-                        $parameters[] = $param->getDefaultValue();
-                    } else {
-                        throw $e;
-                    }
-                }
-            } else {
-                // للأنواع الأساسية (Builtin) كالـ int و string
-                if (array_key_exists($param->getName(), $this->args)) {
-                    $parameters[] = $this->args[$param->getName()];
-                } elseif ($param->isOptional()) {
-                    $parameters[] = $param->getDefaultValue();
-                } else {
-                    // إذا لم نجد المتغير، نضع null أو نأخذ أول قيمة غير مستخدمة (يفضل null لمنع الأخطاء العشوائية)
-                    $parameters[] = null;
-                }
-            }
+        foreach ($reflect->getParameters() as $param) {
+            $parameters[] = $this->resolveParameter($param);
         }
 
         return $parameters;
     }
 
+    private function getReflectionSignature(\Reflector $reflection): ?\ReflectionFunctionAbstract
+    {
+        if ($reflection instanceof \ReflectionFunctionAbstract) {
+            return $reflection;
+        }
+        if ($reflection instanceof \ReflectionClass) {
+            return $reflection->getConstructor();
+        }
+        return null;
+    }
+
+    private function resolveParameter(\ReflectionParameter $param): mixed
+    {
+        $type = $param->getType();
+
+        if ($type && !$type->isBuiltin()) {
+            return $this->resolveClassDependency($param, $type->getName());
+        }
+
+        return $this->resolvePrimitiveDependency($param);
+    }
+
+    private function resolveClassDependency(\ReflectionParameter $param, string $className): mixed
+    {
+        if (array_key_exists($className, $this->args)) {
+            return $this->args[$className];
+        }
+
+        try {
+            return $this->get($className);
+        } catch (\Exception $e) {
+            if ($param->isOptional()) {
+                return $param->getDefaultValue();
+            }
+            throw $e;
+        }
+    }
+
+    private function resolvePrimitiveDependency(\ReflectionParameter $param): mixed
+    {
+        if (array_key_exists($param->getName(), $this->args)) {
+            return $this->args[$param->getName()];
+        }
+
+        if ($param->isOptional()) {
+            return $param->getDefaultValue();
+        }
+
+        $location = $param->getDeclaringClass() ? $param->getDeclaringClass()->getName() : 'Closure';
+        throw new RuntimeException("Cannot resolve required parameter \${$param->getName()} in {$location}.");
+    }
+
     /**
      * تحويل الدالة المجهولة (Closure) إلى ReflectionFunction
-     * 
-     * @param callable $callback
-     * @return ReflectionFunction
      */
-    protected function callable($callback)
+    protected function callable($callback): ReflectionFunction
     {
         return new ReflectionFunction($callback);
     }
 
     /**
      * تنفيذ دالة أو كلاس بعد حقن جميع تبعياته
-     * 
-     * @param callable|array $callback الدالة أو الكلاس المراد تنفيذه
-     * @return mixed نتيجة التنفيذ
-     * @throws \Exception
      */
     public function call($callback)
     {
         if (is_array($callback)) {
-            if (isset($callback[1])) {
-                list($class, $method) = $callback;
-                $reflect = new ReflectionMethod($class, $method);
-                $callback[0] = new ReflectionClass($callback[0]);
-                $constructor = $callback[0]->getConstructor();
-
-                $args = [];
-                if (!empty($constructor)) {
-                    $args = $this->generateArgs($callback[0]);
-                }
-                $callback[0] = $callback[0]->newInstanceArgs($args ?? []);
-            }
-
-            $args = $this->generateArgs($reflect) ?? [];
-            return call_user_func_array($callback, $args);
-
-        } elseif (is_callable($callback)) {
-            $reflect = $this->callable($callback);
-            $args = $this->generateArgs($reflect) ?? [];
-            return call_user_func_array($callback, $args);
-
-        } else {
-            throw new \Exception("Cannot resolve callback in Container");
+            return $this->callArrayCallback($callback);
         }
+
+        if (is_callable($callback)) {
+            return $this->callClosureCallback($callback);
+        }
+
+        throw new \Exception("Cannot resolve callback in Container.");
+    }
+
+    private function callArrayCallback(array $callback): mixed
+    {
+        if (!isset($callback[1])) {
+            throw new \Exception("Invalid array callback provided.");
+        }
+
+        [$classOrObject, $method] = $callback;
+
+        if (is_string($classOrObject)) {
+            $classOrObject = $this->hasInstance($classOrObject) ? $this->instances[$classOrObject] : $this->get($classOrObject);
+            $callback[0] = $classOrObject;
+        }
+
+        $reflect = new ReflectionMethod($classOrObject, $method);
+        $args = $this->generateArgs($reflect) ?? [];
+
+        return call_user_func_array($callback, $args);
+    }
+
+    private function callClosureCallback(callable $callback): mixed
+    {
+        $reflect = $this->callable($callback);
+        $args = $this->generateArgs($reflect) ?? [];
+
+        return call_user_func_array($callback, $args);
     }
 
     /**

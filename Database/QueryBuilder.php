@@ -119,6 +119,16 @@ class QueryBuilder
         return $this->join($table, $first, $operator, $second, 'RIGHT');
     }
 
+    /** @var array<int, string> */
+    protected array $allowedOperators = [
+        '=', '<', '>', '<=', '>=', '<>', '!=', '<=>',
+        'like', 'like binary', 'not like', 'ilike',
+        '&', '|', '^', '<<', '>>',
+        'rlike', 'not rlike', 'regexp', 'not regexp',
+        '~', '~*', '!~', '!~*', 'similar to',
+        'not similar to', 'not ilike', '~~*', '!~~*',
+    ];
+
     public function where(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'AND'): self
     {
         if (func_num_args() === 2) {
@@ -134,10 +144,15 @@ class QueryBuilder
             return $this->whereNotNull($column, $boolean);
         }
 
+        $operator = strtolower((string) $operator);
+        if (!in_array($operator, $this->allowedOperators, true)) {
+            throw new InvalidArgumentException("Unsupported operator [{$operator}].");
+        }
+
         $placeholder = $this->bindValue($value);
         $this->wheres[] = [
             'boolean' => strtoupper($boolean),
-            'sql' => sprintf('%s %s %s', $this->wrap($column), $operator, $placeholder),
+            'sql' => sprintf('%s %s %s', $this->wrap($column), strtoupper($operator), $placeholder),
         ];
 
         return $this;
@@ -265,10 +280,15 @@ class QueryBuilder
             $operator = '=';
         }
 
+        $operator = strtolower((string) $operator);
+        if (!in_array($operator, $this->allowedOperators, true)) {
+            throw new InvalidArgumentException("Unsupported operator [{$operator}].");
+        }
+
         $placeholder = $this->bindValue($value);
         $this->havings[] = [
             'boolean' => strtoupper($boolean),
-            'sql' => sprintf('%s %s %s', $this->wrap($column), $operator, $placeholder),
+            'sql' => sprintf('%s %s %s', $this->wrap($column), strtoupper($operator), $placeholder),
         ];
 
         return $this;

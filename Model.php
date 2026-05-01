@@ -56,12 +56,7 @@ abstract class Model
             return $this->table;
         }
 
-        $class = static::class;
-        $baseName = str_contains($class, '\\')
-            ? substr($class, (int) strrpos($class, '\\') + 1)
-            : $class;
-
-        $snake = strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $baseName));
+        $snake = $this->snakeCase($this->getClassShortName(static::class));
 
         return str_ends_with($snake, 's') ? $snake : $snake . 's';
     }
@@ -121,14 +116,21 @@ abstract class Model
         return $this->query()->insertGetId($attributes);
     }
 
-    public function firstOrCreate(array $conditions, array $values = []): array
+    /**
+     * تطبيق مجموعة من الشروط على الاستعلام
+     */
+    private function applyConditions(QueryBuilder $query, array $conditions): QueryBuilder
     {
-        $query = $this->query();
         foreach ($conditions as $column => $value) {
             $query->where((string) $column, $value);
         }
+        return $query;
+    }
 
-        $record = $query->first();
+    public function firstOrCreate(array $conditions, array $values = []): array
+    {
+        $record = $this->applyConditions($this->query(), $conditions)->first();
+        
         if ($record !== null) {
             return $record;
         }
@@ -140,23 +142,21 @@ abstract class Model
 
     public function updateOrCreate(array $conditions, array $values = []): array
     {
-        $query = $this->query();
-        foreach ($conditions as $column => $value) {
-            $query->where((string) $column, $value);
-        }
-
-        $record = $query->first();
+        $record = $this->applyConditions($this->query(), $conditions)->first();
+        
         if ($record === null) {
             $id = $this->create([...$conditions, ...$values]);
-
             return $this->findOrFail($id);
         }
 
-        $this->query()
-            ->where($this->getPrimaryKey(), $record[$this->getPrimaryKey()] ?? null)
-            ->update($values);
+        $primaryKey = $record[$this->getPrimaryKey()] ?? null;
+        
+        if ($primaryKey) {
+            $this->updateById($primaryKey, $values);
+            return $this->findOrFail($primaryKey);
+        }
 
-        return $this->findOrFail($record[$this->getPrimaryKey()]);
+        return $record;
     }
 
     public function updateById(int|string $id, array $attributes): int
@@ -209,7 +209,7 @@ abstract class Model
             throw new InvalidArgumentException("Related model [{$related}] must extend " . self::class . '.');
         }
 
-        $foreignKey ??= strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $this->shortName($related))) . '_id';
+        $foreignKey ??= $this->snakeCase($this->getClassShortName($related)) . '_id';
 
         return $instance->query()->where($ownerKey, $value);
     }
@@ -222,7 +222,7 @@ abstract class Model
         }
 
         $localKey ??= $this->getPrimaryKey();
-        $foreignKey ??= strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $this->shortName(static::class))) . '_id';
+        $foreignKey ??= $this->snakeCase($this->getClassShortName(static::class)) . '_id';
 
         return $instance->query()->where($foreignKey, $localValue);
     }
@@ -250,10 +250,21 @@ abstract class Model
         return $instance->{$method}(...$arguments);
     }
 
-    private function shortName(string $class): string
+    /**
+     * الحصول على الاسم القصير للكلاس (بدون Namespace)
+     */
+    protected function getClassShortName(string $class): string
     {
         return str_contains($class, '\\')
             ? substr($class, (int) strrpos($class, '\\') + 1)
             : $class;
+    }
+
+    /**
+     * تحويل النص إلى صيغة snake_case
+     */
+    protected function snakeCase(string $value): string
+    {
+        return strtolower((string) preg_replace('/(?<!^)[A-Z]/', '_$0', $value));
     }
 }

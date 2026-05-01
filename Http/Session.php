@@ -16,38 +16,55 @@ namespace yurni\Http;
  *   $session->getFlash('success');    // 'Done!'
  *   $session->destroy();
  */
-class Session {
+class Session
+{
 
     private const FLASH_KEY = '_flash';
 
-    public function __construct() {
+    /**
+     * يضمن أن tickFlash() تُنفَّذ مرة واحدة فقط طوال دورة حياة الطلب،
+     * بغض النظر عن عدد مرات إنشاء new Session().
+     */
+    private static bool $ticked = false;
+
+    public function __construct()
+    {
         $this->start();
-        $this->tickFlash();
+
+        if (!self::$ticked) {
+            $this->tickFlash();
+            self::$ticked = true;
+        }
     }
 
     // -------------------------------------------------------------------------
     //  Core: get / set / has / remove
     // -------------------------------------------------------------------------
 
-    public function set(string $key, mixed $value): static {
+    public function set(string $key, mixed $value): static
+    {
         $_SESSION[$key] = $value;
         return $this;
     }
 
-    public function get(string $key, mixed $default = null): mixed {
+    public function get(string $key, mixed $default = null): mixed
+    {
         return $_SESSION[$key] ?? $default;
     }
 
-    public function has(string $key): bool {
+    public function has(string $key): bool
+    {
         return isset($_SESSION[$key]);
     }
 
-    public function remove(string $key): static {
+    public function remove(string $key): static
+    {
         unset($_SESSION[$key]);
         return $this;
     }
 
-    public function all(): array {
+    public function all(): array
+    {
         return $_SESSION;
     }
 
@@ -58,7 +75,8 @@ class Session {
     /**
      * Set a flash message.
      */
-    public function flash(string $key, mixed $message): static {
+    public function flash(string $key, mixed $message): static
+    {
         $_SESSION[self::FLASH_KEY]['new'][$key] = $message;
         return $this;
     }
@@ -66,14 +84,16 @@ class Session {
     /**
      * Read a flash message from the current request.
      */
-    public function getFlash(string $key, mixed $default = null): mixed {
+    public function getFlash(string $key, mixed $default = null): mixed
+    {
         return $_SESSION[self::FLASH_KEY]['current'][$key] ?? $default;
     }
 
     /**
      * Check if a flash message exists in the current request.
      */
-    public function hasFlash(string $key): bool {
+    public function hasFlash(string $key): bool
+    {
         return isset($_SESSION[self::FLASH_KEY]['current'][$key]);
     }
 
@@ -84,7 +104,8 @@ class Session {
     /**
      * Regenerate the session ID (use after login to prevent session fixation).
      */
-    public function regenerate(bool $deleteOld = true): static {
+    public function regenerate(bool $deleteOld = true): static
+    {
         session_regenerate_id($deleteOld);
         return $this;
     }
@@ -92,7 +113,8 @@ class Session {
     /**
      * Destroy the session completely.
      */
-    public function destroy(): void {
+    public function destroy(): void
+    {
         $_SESSION = [];
 
         if (ini_get('session.use_cookies') && isset($_COOKIE[session_name()])) {
@@ -107,7 +129,8 @@ class Session {
     //  Internal
     // -------------------------------------------------------------------------
 
-    private function start(): void {
+    private function start(): void
+    {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -117,10 +140,13 @@ class Session {
      * Move flash "new" → "current" on every request.
      * "current" was the previous request's "new", so it's now accessible.
      */
-    private function tickFlash(): void {
+    private function tickFlash(): void
+    {
         $_SESSION[self::FLASH_KEY]['current'] = $_SESSION[self::FLASH_KEY]['new'] ?? [];
-        $_SESSION[self::FLASH_KEY]['new']     = [];
+        $_SESSION[self::FLASH_KEY]['new'] = [];
     }
 
-    public function __destruct() {}
+    public function __destruct()
+    {
+    }
 }

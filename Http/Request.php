@@ -103,12 +103,12 @@ class Request
     public function header(string $key, $default = null)
     {
         $headerKey = str_replace('-', '_', strtoupper($key));
-        
+
         // التحقق من الصيغة القياسية (HTTP_NAME)
         if (isset($this->_server['HTTP_' . $headerKey])) {
             return $this->_server['HTTP_' . $headerKey];
         }
-        
+
         // التحقق من الحالات الخاصة مثل CONTENT_TYPE و CONTENT_LENGTH
         if (isset($this->_server[$headerKey])) {
             return $this->_server[$headerKey];
@@ -250,26 +250,41 @@ class Request
         return strtolower($this->server('REQUEST_METHOD'));
     }
 
-    // التحقق من نوع الطلب
-    public function isPost()
+    // -------------------------------------------------------------------------
+    // HTTP Method Helpers
+    // هذه الدوال تصف الطلب الحالي القادم من المستخدم.
+    // السؤال هنا: "ما نوع هذا الطلب؟" — وهو سؤال Request وليس Route.
+    // للتحقق مما يقبله مسار معين استخدم: $route->acceptsMethod('post')
+    // -------------------------------------------------------------------------
+
+    public function isMethod(string $method): bool
     {
-        return $this->getMethod() == "post";
+        return $this->getMethod() === strtolower($method);
     }
-    public function isGet()
+
+    public function isPost(): bool
     {
-        return $this->getMethod() == "get";
+        return $this->isMethod('post');
     }
-    public function isPut()
+
+    public function isGet(): bool
     {
-        return $this->getMethod() == "put";
+        return $this->isMethod('get');
     }
-    public function isPatch()
+
+    public function isPut(): bool
     {
-        return $this->getMethod() == "patch";
+        return $this->isMethod('put');
     }
-    public function isDelete()
+
+    public function isPatch(): bool
     {
-        return $this->getMethod() == "delete";
+        return $this->isMethod('patch');
+    }
+
+    public function isDelete(): bool
+    {
+        return $this->isMethod('delete');
     }
 
     public function isHttps()
@@ -299,11 +314,17 @@ class Request
     }
 
     /**
-     * استخراج جميع المدخلات المرسلة في الطلب وتنقيتها (Sanitization)
-     * 
-     * @return array مصفوفة المدخلات بعد التنقية الأساسية
+     * استخراج جميع المدخلات المرسلة في الطلب — بيانات خام كما أرسلها المستخدم.
+     *
+     * القرار التصميمي:
+     *   inputs() تقرأ البيانات فقط، ولا تنقّيها.
+     *   التنقية (Sanitization) والتحقق (Validation) مسؤولية طبقة أعلى (Validator).
+     *   تطبيق FILTER_SANITIZE_SPECIAL_CHARS هنا يسبب double-escaping إذا طبّق
+     *   المستخدم أي تنقية لاحقاً، ويغيّر القيم قبل وصولها لطبقة الأعمال.
+     *
+     * @return array مصفوفة المدخلات الخام
      */
-    public function inputs()
+    public function inputs(): array
     {
         if ($this->inputCache !== null) {
             return $this->inputCache;
@@ -311,39 +332,37 @@ class Request
 
         $body = [];
 
-        // معالجة GET
-        if ($this->isGet() || isset($_GET)) {
+        // ── query string (?key=val) — متاح في جميع أنواع الطلبات ──────────
+        // isset($_GET) شبه دائم الصدق (true حتى لو فارغاً)، لذا نتحقق من المحتوى.
+        if (!empty($_GET)) {
             foreach ($_GET as $key => $val) {
-                $body[$key] = filter_input(INPUT_GET, $key, FILTER_SANITIZE_SPECIAL_CHARS);
+                $body[$key] = $val;
             }
         }
 
-        // معالجة POST
-        if ($this->isPost()) {
+        // ── POST form-encoded / multipart ──────────────────────────────────
+        if ($this->isMethod('post') && !empty($_POST)) {
             foreach ($_POST as $key => $val) {
-                $body[$key] = filter_input(INPUT_POST, $key, FILTER_SANITIZE_SPECIAL_CHARS);
+                $body[$key] = $val;
             }
         }
 
-        // معالجة الطلبات التي تعتمد على JSON أو البيانات الخام (POST, PUT, PATCH, DELETE)
-        if ($this->isPost() || $this->isPut() || $this->isDelete() || $this->isPatch()) {
+        // ── Raw body: JSON أو urlencoded لـ PUT / PATCH / DELETE / POST ────
+        if ($this->isMethod('post') || $this->isMethod('put') || $this->isMethod('delete') || $this->isMethod('patch')) {
             $raw_body = $this->body();
             $content_type = $this->header('Content-Type') ?: '';
 
-            if (strpos($content_type, 'application/json') !== false) {
-                $obj = json_decode($raw_body, true);
-                if ($obj && is_array($obj)) {
-                    foreach ($obj as $key => $val) {
-                        $body[$key] = $val;
-                    }
+            if ($raw_body !== '' && strpos($content_type, 'application/json') !== false) {
+                $decoded = json_decode($raw_body, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    // JSON يحل محل أي قيمة بنفس المفتاح من $_POST
+                    $body = array_merge($body, $decoded);
                 }
-            } elseif (!$this->isPost()) {
-                // للطلبات غير الـ POST وغير الـ JSON (مثل PUT urlencoded)
+            } elseif ($raw_body !== '' && !$this->isMethod('post')) {
+                // PUT / PATCH / DELETE urlencoded
                 parse_str($raw_body, $parsed_vars);
                 if (is_array($parsed_vars)) {
-                    foreach ($parsed_vars as $key => $val) {
-                        $body[$key] = filter_var($val, FILTER_SANITIZE_SPECIAL_CHARS);
-                    }
+                    $body = array_merge($body, $parsed_vars);
                 }
             }
         }
@@ -372,33 +391,6 @@ class Request
         return $this->input($key) ?? null;
     }
 
-    /**
-     * تنقية قيمة إدخال على أنها بريد إلكتروني
-     * 
-     * @param string $key
-     * @return string
-     */
-    public function sanitizeEmail($key)
-    {
-        return filter_var($this->input($key), FILTER_SANITIZE_EMAIL);
-    }
-
-    /**
-     * تنقية قيمة إدخال كنص وإزالة الخصائص الخاصة لمنع XSS
-     * 
-     * @param string $key
-     * @return string
-     */
-    /**
-     * تنقية قيمة إدخال كنص وإزالة الخصائص الخاصة لمنع XSS
-     * 
-     * @param string $key
-     * @return string
-     */
-    public function sanitizeString($key)
-    {
-        return htmlspecialchars((string) $this->input($key), ENT_QUOTES, 'UTF-8');
-    }
 
     /**
      * الحصول على توكن CSRF من الطلب (Input أو Headers)
@@ -407,8 +399,41 @@ class Request
      */
     public function csrfToken()
     {
-        return $this->input('csrf_token') 
-            ?: $this->header('X-CSRF-TOKEN') 
+        return $this->input('csrf_token')
+            ?: $this->header('X-CSRF-TOKEN')
             ?: $this->header('X-XSRF-TOKEN');
+    }
+
+    /**
+     * التحقق من المدخلات باستخدام Validator
+     * يعيد البيانات المتحقق منها إذا نجح، أو يقوم بإعادة التوجيه للخلف مع رسائل الأخطاء.
+     *
+     * @param array $rules قواعد التحقق
+     * @param array $messages رسائل الأخطاء المخصصة (اختياري)
+     * @return array البيانات التي تم التحقق منها
+     */
+    public function validate(array $rules, array $messages = []): array
+    {
+        $validator = \yurni\Helpers\Validator::make($this->inputs(), $rules, $messages);
+
+        if ($validator->fails()) {
+            $session = $this->getSession();
+            $session->flash('errors', $validator->errors());
+            $session->flash('old', $this->inputs());
+
+            $referer = $this->header('referer', '/');
+            header("Location: $referer");
+            exit;
+        }
+
+        $validatedData = [];
+        foreach (array_keys($rules) as $field) {
+            // Support dot notation if needed in future, currently just plain keys
+            if ($this->input($field) !== null) {
+                $validatedData[$field] = $this->input($field);
+            }
+        }
+
+        return $validatedData;
     }
 }

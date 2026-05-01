@@ -50,7 +50,7 @@ class Router
         // استجابة افتراضية في حالة عدم العثور على المسار
         $this->handle("404", function () {
             http_response_code(404);
-            echo "<h1>404 Not Found</h1><p>The requested URL was not found on this server.</p>";
+            $this->app->renderErrorPage('404');
         });
     }
 
@@ -214,16 +214,30 @@ class Router
         $this->request->setRoute($route);
 
         // تشغيل الـ Middlewares المسجلة على هذا المسار
+        if (!$this->runMiddlewares($route)) {
+            return false;
+        }
+
+        return $this->resolveCallback($route->getCallback(), $route->getParam());
+    }
+
+    /**
+     * تشغيل البرمجيات الوسيطة الخاصة بمسار معين
+     *
+     * @param Route $route
+     * @return bool يعيد false إذا تم حظر الطلب من قبل أحد الـ Middlewares
+     */
+    private function runMiddlewares(\yurni\Router\Route $route): bool
+    {
         foreach ($route->getMiddlewares() as $key) {
             if (!$this->app->getMiddleware($key)) {
                 if (http_response_code() === 200) {
                     http_response_code(403);
-                    echo "<h1>403 Forbidden</h1><p>Access Denied.</p>";
+                    $this->app->renderErrorPage('403');
                 }
                 return false;
             }
         }
-
-        return $this->resolveCallback($route->getCallback(), $route->getParam());
+        return true;
     }
 }

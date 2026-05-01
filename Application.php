@@ -118,21 +118,34 @@ class Application
     private function loadEnv(): void
     {
         $envFile = $this->basePath . '/.env';
+        
         if (class_exists(\Dotenv\Dotenv::class)) {
             $dotenv = \Dotenv\Dotenv::createImmutable($this->basePath);
             $dotenv->safeLoad();
         } elseif (file_exists($envFile)) {
-            $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-            foreach ($lines as $line) {
-                if (strpos(trim($line), '#') === 0)
-                    continue;
-                if (strpos($line, '=') !== false) {
-                    [$name, $value] = explode('=', $line, 2);
-                    $_ENV[trim($name)] = trim($value);
-                }
+            $this->loadEnvManually($envFile);
+        }
+        
+        Config::load($_ENV);
+    }
+
+    /**
+     * قراءة ملف .env يدوياً في حال عدم وجود حزمة vlucas/phpdotenv
+     *
+     * @param string $envFile مسار الملف
+     */
+    private function loadEnvManually(string $envFile): void
+    {
+        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (strpos(trim($line), '#') === 0) {
+                continue;
+            }
+            if (strpos($line, '=') !== false) {
+                [$name, $value] = explode('=', $line, 2);
+                $_ENV[trim($name)] = trim($value);
             }
         }
-        Config::load($_ENV);
     }
 
     /**
@@ -391,76 +404,71 @@ class Application
         return $this->router->register($methods, $path, $callback);
     }
 
+
+
     /**
      * تشغيل التطبيق (معالجة الطلب وإرجاع الاستجابة)
      *
-     * @return void|false
+     * @return void
      */
     public function run(): void
     {
         try {
-            // التحقق من توكن CSRF تلقائياً لطلبات POST, PUT, DELETE, PATCH
-            // حل المسار وطباعة المخرجات النهائية
             echo $this->router->resolve();
         } catch (\Throwable $e) {
-            error_log(
-                'Framework Error: ' . $e->getMessage() .
-                    ' in ' . $e->getFile() .
-                    ' on line ' . $e->getLine()
-            );
-
-            http_response_code(500);
-
-            $debug = filter_var(
-                Config::get('APP_DEBUG', Config::get('app_debug', false)),
-                FILTER_VALIDATE_BOOLEAN
-            );
-
-            if ($debug) {
-                echo "<!DOCTYPE html>
-                <html lang='en'>
-                <head>
-                    <meta charset='UTF-8'>
-                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-                    <title>Framework Exception</title>
-                    <style>
-                        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #1a1b26; color: #a9b1d6; direction: ltr; }
-                        .error-header { background-color: #f7768e; padding: 40px; color: #1a1b26; border-bottom: 5px solid #db4b4b; }
-                        .error-header h1 { margin: 0; font-size: 32px; font-weight: 700; }
-                        .error-header p { margin: 10px 0 0 0; font-size: 18px; font-weight: 500; opacity: 0.9; }
-                        .error-container { padding: 40px; max-width: 1200px; margin: 0 auto; }
-                        .error-section { background-color: #24283b; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border: 1px solid #414868; }
-                        .error-section h3 { margin-top: 0; color: #7aa2f7; font-size: 20px; margin-bottom: 15px; border-bottom: 1px solid #414868; padding-bottom: 10px; }
-                        .file-info { background-color: #1f2335; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 16px; color: #e0af68; border-left: 4px solid #ff9e64; margin-bottom: 20px; }
-                        pre { background-color: #1f2335; color: #c0caf5; padding: 20px; border-radius: 6px; overflow-x: auto; font-size: 14px; line-height: 1.6; margin: 0; border: 1px solid #292e42; }
-                        .line { display: block; }
-                        .line:hover { background-color: #292e42; }
-                    </style>
-                </head>
-                <body>
-                    <div class='error-header'>
-                        <h1>Yurni Exception Occurred</h1>
-                        <p>" . htmlspecialchars($e->getMessage()) . "</p>
-                    </div>
-                    <div class='error-container'>
-                        <div class='error-section'>
-                            <h3>Exception Location</h3>
-                            <div class='file-info'>
-                                <strong>File:</strong> " . htmlspecialchars($e->getFile()) . "<br>
-                                <strong>Line:</strong> " . $e->getLine() . "
-                            </div>
-                        </div>
-                        <div class='error-section'>
-                            <h3>Stack Trace</h3>
-                            <pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>
-                        </div>
-                    </div>
-                </body>
-                </html>";
-            } else {
-                echo '<h1>500 Internal Server Error</h1>';
-                echo '<p>An unexpected error occurred. Please try again later.</p>';
-            }
+            $this->renderException($e);
         }
+    }
+
+    /**
+     * تحميل وعرض صفحة خطأ كقالب
+     * يسمح للمطورين بتخصيص قوالب الأخطاء عن طريق إنشاء مجلد resources/views/errors/
+     *
+     * @param string $view اسم القالب (مثلاً '404', '500', 'exception')
+     * @param array $data بيانات تمرر للقالب
+     * @return void
+     */
+    public function renderErrorPage(string $view, array $data = []): void
+    {
+        extract($data);
+        
+        $customView = $this->basePath . '/app/views/errors/' . $view . '.php';
+        $defaultView = __DIR__ . '/View/errors/' . $view . '.php';
+        
+        if (file_exists($customView)) {
+            require $customView;
+        } elseif (file_exists($defaultView)) {
+            require $defaultView;
+        } else {
+            echo "<h1>Error {$view}</h1>";
+        }
+    }
+
+    /**
+     * معالجة الاستثناءات وطباعة شاشة الخطأ
+     *
+     * @param \Throwable $e
+     */
+    private function renderException(\Throwable $e): void
+    {
+        error_log(
+            'Framework Error: ' . $e->getMessage() .
+                ' in ' . $e->getFile() .
+                ' on line ' . $e->getLine()
+        );
+
+        http_response_code(500);
+
+        $debug = filter_var(
+            Config::get('APP_DEBUG', Config::get('app_debug', false)),
+            FILTER_VALIDATE_BOOLEAN
+        );
+
+        if (!$debug) {
+            $this->renderErrorPage('500');
+            return;
+        }
+
+        $this->renderErrorPage('exception', ['e' => $e]);
     }
 }
