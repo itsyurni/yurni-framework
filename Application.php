@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace yurni;
 
@@ -259,7 +260,7 @@ class Application
      * @param string                 $name     Middleware name
      * @param callable|string|array  $callable Implementation
      */
-    public function setMiddleware(string $name, $callable): void
+    public function setMiddleware(string $name, callable|string|array $callable): void
     {
         $this->middlewares[$name] = $callable;
     }

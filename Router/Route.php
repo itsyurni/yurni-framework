@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace yurni\Router;
 
 /**
@@ -15,7 +17,7 @@ class Route
     /**
      * @var array|string طرق الطلب المسموحة (مثل ['get', 'post'])
      */
-    protected $method;
+    protected array|string $method;
 
     /**
      * @var string الرابط أو التعبير النمطي للرابط
@@ -46,7 +48,7 @@ class Route
      * @param string         $uri      مسار الرابط
      * @param callable|array $callback الدالة المراد تنفيذها
      */
-    public function __construct($method, string $uri, $callback)
+    public function __construct(array|string $method, string $uri, callable|array $callback)
     {
         $this->method   = $method;
         $this->uri      = $uri;

@@ -1,11 +1,14 @@
 <?php
+declare(strict_types=1);
+
 namespace yurni;
 
 /**
  * كلاس إدارة الإعدادات (Config Management)
  * يوفر واجهة موحدة لجلب وتخزين الإعدادات من وإلى التطبيق أو بيئة التشغيل (.env).
  */
-class Config {
+class Config
+{
     
     /**
      * @var array مصفوفة الإعدادات المحملة
@@ -35,7 +38,7 @@ class Config {
      * @param mixed $default القيمة الافتراضية في حال عدم العثور على الإعداد
      * @return mixed قيمة الإعداد
      */
-    public static function get(string $key, $default = null)
+    public static function get(string $key, mixed $default = null): mixed
     {
         $key = strtolower($key);
         $upperKey = strtoupper($key);
@@ -65,7 +68,9 @@ class Config {
      * @param string $key مفتاح الإعداد
      * @param mixed $value قيمة الإعداد
      */
-    public static function set(string $key, $value): void {
+    public static function set(string $key, mixed $value): void
+    {
         self::$config[strtolower($key)] = $value;
     }
 }
+

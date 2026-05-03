@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace yurni;
 
 use Reflector;
@@ -45,9 +47,9 @@ class Container implements ContainerInterface
      * حقن مصفوفة من المتغيرات لاستخدامها لاحقاً
      * 
      * @param array $args مصفوفة المتغيرات
-     * @return self
+     * @return $this
      */
-    public function injectArgs($args)
+    public function injectArgs(array $args): static
     {
         foreach ($args as $key => $val) {
             if (!isset($this->args[$key])) {
@@ -61,7 +63,7 @@ class Container implements ContainerInterface
      * استخراج وتوليد المعاملات المطلوبة لدالة أو كلاس معين
      * بناءً على الـ Type Hinting باستخدام الـ Reflection
      */
-    public function generateArgs(\Reflector $reflection)
+    public function generateArgs(\Reflector $reflection): array
     {
         $parameters = [];
         $reflect = $this->getReflectionSignature($reflection);
@@ -132,7 +134,7 @@ class Container implements ContainerInterface
     /**
      * تحويل الدالة المجهولة (Closure) إلى ReflectionFunction
      */
-    protected function callable($callback): ReflectionFunction
+    protected function createReflectionFunction(callable $callback): ReflectionFunction
     {
         return new ReflectionFunction($callback);
     }
@@ -140,7 +142,7 @@ class Container implements ContainerInterface
     /**
      * تنفيذ دالة أو كلاس بعد حقن جميع تبعياته
      */
-    public function call($callback)
+    public function call(array|callable $callback): mixed
     {
         if (is_array($callback)) {
             return $this->callArrayCallback($callback);
@@ -174,7 +176,7 @@ class Container implements ContainerInterface
 
     private function callClosureCallback(callable $callback): mixed
     {
-        $reflect = $this->callable($callback);
+        $reflect = $this->createReflectionFunction($callback);
         $args = $this->generateArgs($reflect) ?? [];
 
         return call_user_func_array($callback, $args);
@@ -187,7 +189,7 @@ class Container implements ContainerInterface
      * @return mixed الكائن المطلوب
      * @throws NotFoundException
      */
-    public function get(string $id)
+    public function get(string $id): mixed
     {
         if ($this->hasInstance($id)) {
             return $this->instances[$id];
@@ -264,8 +266,9 @@ class Container implements ContainerInterface
      * @param mixed $instance
      * @return void
      */
-    public function instance(string $id, $instance): void
+    public function instance(string $id, mixed $instance): void
     {
         $this->instances[$id] = $instance;
     }
 }
+

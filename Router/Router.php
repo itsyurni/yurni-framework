@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace yurni\Router;
 
 use yurni\Application;
@@ -66,7 +68,7 @@ class Router
      * @param callable|array $action Callback or controller action
      * @return Route
      */
-    public function register($method, string $uri, $action): Route
+    public function register(array|string $method, string $uri, callable|array $action): Route
     {
         $routeUri = $this->routeToRegex($uri);
         $route = new Route($method, $routeUri, $action);
@@ -106,7 +108,7 @@ class Router
      * @param string $type
      * @return mixed
      */
-    public function getHandle(string $type)
+    public function getHandle(string $type): mixed
     {
         return $this->app->container()->call($this->handle[$type]);
     }
@@ -151,7 +153,7 @@ class Router
      * @param string $method The HTTP request method
      * @return Route|false
      */
-    protected function findRoute(string $path, string $method)
+    protected function findRoute(string $path, string $method): Route|false
     {
         foreach ($this->getRoutes() as $route) {
             if (
@@ -177,7 +179,7 @@ class Router
      * @param array          $args
      * @return mixed
      */
-    public function resolveCallback($callback, array $args)
+    public function resolveCallback(callable|array $callback, array $args): mixed
     {
         $output = $this->app->container()->injectArgs($args)->call($callback);
 
@@ -199,7 +201,7 @@ class Router
      *
      * @return mixed
      */
-    public function resolve()
+    public function resolve(): mixed
     {
         $path = $this->request->getPath();
         $method = $this->request->getMethod();

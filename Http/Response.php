@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 namespace yurni\Http;
 
 use InvalidArgumentException;
@@ -162,7 +164,7 @@ class Response
      * 
      * @return self
      */
-    public function reset()
+    public function reset(): self
     {
         $this->body = null;
         return $this;

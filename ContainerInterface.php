@@ -1,11 +1,14 @@
 <?php
+declare(strict_types=1);
+
 namespace yurni;
 
 /**
  * واجهة حاوية التبعيات المتوافقة مع معيار PSR-11
  * PSR-11 Container Interface
  */
-interface ContainerInterface {
+interface ContainerInterface
+{
     /**
      * البحث عن كائن داخل الحاوية عن طريق المُعرّف الخاص به وإرجاعه.
      *
@@ -13,7 +16,7 @@ interface ContainerInterface {
      * @return mixed الكائن المطلوب
      * @throws \Exception إذا لم يتم العثور على الكائن
      */
-    public function get(string $id);
+    public function get(string $id): mixed;
 
     /**
      * التحقق مما إذا كانت الحاوية تمتلك كائناً أو تعريفاً للمُعرّف المطلوب.
