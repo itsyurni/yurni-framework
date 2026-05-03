@@ -18,7 +18,13 @@ class Config {
      * @param array $config مصفوفة الإعدادات المراد تحميلها
      */
     public static function load(array $config): void {
-        self::$config = array_merge(self::$config, $config);
+        $normalized = [];
+
+        foreach ($config as $configKey => $value) {
+            $normalized[strtolower((string) $configKey)] = $value;
+        }
+
+        self::$config = array_merge(self::$config, $normalized);
     }
 
     /**
@@ -29,13 +35,21 @@ class Config {
      * @param mixed $default القيمة الافتراضية في حال عدم العثور على الإعداد
      * @return mixed قيمة الإعداد
      */
-    public static function get(string $key, $default = null) {
+    public static function get(string $key, $default = null)
+    {
+        $key = strtolower($key);
+        $upperKey = strtoupper($key);
+
         // البحث في المصفوفة المحملة مسبقاً
         if (array_key_exists($key, self::$config)) {
             return self::$config[$key];
         }
 
         // البحث في متغيرات البيئة (Environment Variables)
+        if (isset($_ENV[$upperKey])) {
+            return $_ENV[$upperKey];
+        }
+
         if (isset($_ENV[$key])) {
             return $_ENV[$key];
         }
@@ -44,6 +58,7 @@ class Config {
         return $default;
     }
 
+
     /**
      * حفظ أو تحديث إعداد معين في الذاكرة أثناء التشغيل
      *
@@ -51,6 +66,6 @@ class Config {
      * @param mixed $value قيمة الإعداد
      */
     public static function set(string $key, $value): void {
-        self::$config[$key] = $value;
+        self::$config[strtolower($key)] = $value;
     }
 }

@@ -1,3 +1,9 @@
+<?php
+/**
+ * @var \Throwable $e
+ * @var string|null $errorSource
+ */
+?>
 <!DOCTYPE html>
 <html lang='en'>
 <head>
@@ -20,6 +26,7 @@
     <div class='error-header'>
         <h1>Yurni Exception Occurred</h1>
         <p><?= htmlspecialchars($e->getMessage()) ?></p>
+        <p style='opacity:0.75; margin-top: 8px;'>Source: <?= htmlspecialchars($errorSource ?? 'Application error') ?></p>
     </div>
     <div class='error-container'>
         <div class='error-section'>

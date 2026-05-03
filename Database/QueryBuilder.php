@@ -677,7 +677,7 @@ class QueryBuilder
         }
 
         return implode('.', array_map(
-            static fn (string $segment): string => '`' . str_replace('`', '', $segment) . '`',
+            static fn (string $segment): string => $segment === '*' ? '*' : '`' . str_replace('`', '', $segment) . '`',
             explode('.', $value)
         ));
     }

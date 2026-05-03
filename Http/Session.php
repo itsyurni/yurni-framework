@@ -132,8 +132,30 @@ class Session
     private function start(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
+            $this->setSecureCookieOptions();
             session_start();
         }
+    }
+
+    /**
+     * Apply hardened session cookie settings before session startup.
+     */
+    private function setSecureCookieOptions(): void
+    {
+        $params = session_get_cookie_params();
+        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ($_SERVER['SERVER_PORT'] ?? null) === '443';
+
+        session_set_cookie_params([
+            'lifetime' => $params['lifetime'] ?? 0,
+            'path' => $params['path'] ?? '/',
+            'domain' => $params['domain'] ?? '',
+            'secure' => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+
+        ini_set('session.use_strict_mode', '1');
     }
 
     /**

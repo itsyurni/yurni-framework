@@ -16,6 +16,7 @@ class Template
     private string $cache_path;
     private bool $cache_enabled;
     private bool $optimize;
+    private bool $allow_php;
 
     public function __construct(array $data = [])
     {
@@ -23,6 +24,7 @@ class Template
         $this->cache_path = rtrim($data['cache_path'], '/\\') . DIRECTORY_SEPARATOR;
         $this->cache_enabled = $data['cache'] ?? false;
         $this->optimize = $data['optimize'] ?? false;
+        $this->allow_php = $data['allow_php'] ?? false;
     }
 
     // =========================================================================
@@ -92,10 +94,20 @@ class Template
     public function includeFile(string $file): string
     {
         $file = trim($file, "'\"");
+
+        if ($file === '' || strpos($file, "\0") !== false) {
+            throw new \RuntimeException('Invalid template name.');
+        }
+
+        if (strpos($file, '..') !== false) {
+            throw new \RuntimeException('Template path traversal attempt detected.');
+        }
+
         $file_with_ext = $this->ensureExtension($file);
+        $source_file = $this->temp_path . $file_with_ext;
 
         $realBase = realpath($this->temp_path);
-        $realFile = realpath($this->temp_path . $file_with_ext);
+        $realFile = realpath($source_file);
 
         if ($realBase === false) {
             throw new \RuntimeException("Templates directory not found: {$this->temp_path}");
@@ -107,6 +119,14 @@ class Template
 
         $code = file_get_contents($realFile);
 
+        // Temporarily protect verbatim blocks from being processed for includes/extends
+        $tempVerbatim = [];
+        $code = preg_replace_callback('/\{%\s*verbatim\s*%\}(.*?)\{%\s*endverbatim\s*%\}/is', function($matches) use (&$tempVerbatim) {
+            $placeholder = "___TEMP_VERBATIM_" . count($tempVerbatim) . "___";
+            $tempVerbatim[$placeholder] = $matches[0];
+            return $placeholder;
+        }, $code);
+
         if (preg_match_all('/\{%\s*(extends|include)\s*(.+?)\s*\%}/is', $code, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $value) {
                 $code = str_replace($value[0], $this->includeFile($value[2]), $code);
@@ -114,6 +134,11 @@ class Template
         }
 
         $code = preg_replace('/{% ?(extends|include) ?\'?(.*?)\'? ?%}/i', '', $code);
+
+        // Restore verbatim blocks
+        foreach ($tempVerbatim as $placeholder => $content) {
+            $code = str_replace($placeholder, $content, $code);
+        }
 
         return $code;
     }
@@ -125,6 +150,7 @@ class Template
     public function compile(string $output): string
     {
         $output = $this->compileVerbatim($output);
+        $output = $this->compileComments($output);
         $output = $this->compileBlock($output);
         $output = $this->compileYield($output);
         $output = $this->compileConditions($output);
@@ -261,7 +287,26 @@ class Template
 
     private function compileRawPhp(string $output): string
     {
-        return preg_replace('/\{%\s*(.+?)\s*%\}/is', '<?php $1 ?>', $output);
+        if ($this->allow_php) {
+            return preg_replace('/\{%\s*(.+?)\s*%\}/is', '<?php $1 ?>', $output);
+        }
+
+        $output = preg_replace_callback(
+            '/\{%\s*php\s*(.+?)\s*%\}/is',
+            static function ($matches) {
+                return '<?php ' . $matches[1] . ' ?>';
+            },
+            $output
+        );
+
+        if (preg_match('/\{%\s*(.+?)\s*%\}/is', $output, $matches)) {
+            throw new \RuntimeException(
+                'Raw PHP is disabled in templates. Unknown tag found: ' . trim($matches[1]) .
+                '. Use {% php ... %} or enable view_allow_php in config.'
+            );
+        }
+
+        return $output;
     }
 
     // =========================================================================
@@ -304,6 +349,11 @@ class Template
         }
 
         return preg_replace('/\{%\s*yield\s+.*?\s*%\}/i', '', $code);
+    }
+
+    private function compileComments(string $code): string
+    {
+        return preg_replace('/\{#.*?#\}/s', '', $code);
     }
 
     // =========================================================================

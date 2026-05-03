@@ -27,13 +27,18 @@ class FileUpload {
     private string $mimeType;
     private string $location;
 
+    private static array $forbiddenExtensions = [
+        'php', 'php3', 'php4', 'php5', 'phar', 'phtml',
+        'exe', 'sh', 'bat', 'cmd', 'pl', 'jsp', 'asp', 'aspx', 'jar'
+    ];
+
     public function __construct(array $file) {
         $this->tmp          = $file['tmp_name'];
         $this->size         = (int) $file['size'];
         $this->error        = (int) $file['error'];
-        $this->originalName = $file['name'];
-        $this->name         = pathinfo($file['name'], PATHINFO_FILENAME);
-        $this->extension    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $this->originalName = basename((string) $file['name']);
+        $this->name         = $this->sanitizeBasename(pathinfo($this->originalName, PATHINFO_FILENAME));
+        $this->extension    = $this->sanitizeExtension(pathinfo($this->originalName, PATHINFO_EXTENSION));
         $this->location     = $this->tmp;
         $this->mimeType     = $this->detectMime($file);
     }
@@ -95,6 +100,14 @@ class FileUpload {
             );
         }
 
+        if ($this->isForbiddenExtension()) {
+            throw new RuntimeException("Files with extension '{$this->extension}' are not allowed for security reasons.");
+        }
+
+        if ($this->isPotentiallyExecutable()) {
+            throw new RuntimeException("Uploaded file appears to be executable or unsafe.");
+        }
+
         if ($maxSizeKB > 0 && $this->getSizeKB() > $maxSizeKB) {
             throw new RuntimeException(
                 "File is too large ({$this->getSizeKB()} KB). Maximum allowed: {$maxSizeKB} KB."
@@ -121,7 +134,12 @@ class FileUpload {
             throw new RuntimeException("Cannot move file: {$this->getErrorMessage()}");
         }
 
+        $directory = trim((string) preg_replace('/[\x00-\x1F\x7F]+/', '', $directory));
         $directory = rtrim($directory, '/\\');
+
+        if ($directory === '') {
+            throw new RuntimeException('Upload directory cannot be empty.');
+        }
 
         if (!is_dir($directory)) {
             mkdir($directory, 0755, true);
@@ -132,14 +150,22 @@ class FileUpload {
         }
 
         if ($filename !== null) {
-            $this->name = pathinfo($filename, PATHINFO_FILENAME);
+            $this->name = $this->sanitizeBasename(pathinfo($filename, PATHINFO_FILENAME));
             $ext = pathinfo($filename, PATHINFO_EXTENSION);
             if ($ext) {
-                $this->extension = strtolower($ext);
+                $this->extension = $this->sanitizeExtension($ext);
             }
         }
 
+        if ($this->name === '') {
+            $this->name = $this->generateUniqueName();
+        }
+
         $destination = $directory . DIRECTORY_SEPARATOR . $this->getFilename();
+
+        if (file_exists($destination)) {
+            throw new RuntimeException("Destination file '{$destination}' already exists.");
+        }
 
         if (!move_uploaded_file($this->tmp, $destination)) {
             throw new RuntimeException("Failed to move uploaded file to '{$destination}'.");
@@ -155,7 +181,28 @@ class FileUpload {
      * @param string $directory Target directory
      */
     public function moveWithUniqueName(string $directory): static {
-        return $this->move($directory, uniqid('', true));
+        return $this->move($directory, $this->generateUniqueName());
+    }
+
+    private function generateUniqueName(): string
+    {
+        return bin2hex(random_bytes(12));
+    }
+
+    private function isForbiddenExtension(): bool
+    {
+        return $this->extension !== '' && in_array($this->extension, self::$forbiddenExtensions, true);
+    }
+
+    private function isPotentiallyExecutable(): bool
+    {
+        $dangerousMime = [
+            'application/x-php', 'application/x-httpd-php', 'text/x-php',
+            'application/x-sh', 'application/x-msdownload', 'application/x-dosexec',
+        ];
+
+        return in_array($this->mimeType, $dangerousMime, true)
+            || ($this->extension !== '' && in_array($this->extension, ['php', 'phtml', 'phar'], true));
     }
 
     // -------------------------------------------------------------------------
@@ -193,6 +240,18 @@ class FileUpload {
     }
 
     public function __toString(): string {
-        return (string) file_get_contents($this->location);
+        return $this->getFilename();
+    }
+
+    private function sanitizeBasename(string $name): string
+    {
+        $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '_', $name), '._-');
+
+        return $name !== '' ? $name : 'file';
+    }
+
+    private function sanitizeExtension(string $extension): string
+    {
+        return strtolower((string) preg_replace('/[^A-Za-z0-9]+/', '', $extension));
     }
 }

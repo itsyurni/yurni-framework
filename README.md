@@ -29,6 +29,9 @@ DB_CHARSET=utf8mb4
 - **Security First**: Built-in protection against CSRF and common vulnerabilities.
 - **Template Engine**: Dynamic view rendering with clean syntax.
 
+### Documentation
+- **[Documentation Folder](yurni-documentation/README.md)** — دليل تفصيلي من مستوى المبتدئ إلى المتقدم.
+
 ###  Quick Start
 ### ملف `index.php` (نقطة الدخول)
 ```php

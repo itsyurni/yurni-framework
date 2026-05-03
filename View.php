@@ -27,6 +27,7 @@ class View
                 'cache_path' => Config::get('views_cache_path', base_path('app/views/cache')),
                 'cache'      => Config::get('view_cache',       false),
                 'optimize'   => Config::get('view_optimize',    false),
+                'allow_php'  => Config::get('view_allow_php',   false),
             ]);
 
         }

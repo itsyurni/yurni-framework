@@ -22,6 +22,8 @@ class Route
      */
     protected string $uri;
 
+
+
     /**
      * @var string اسم المسار (مفيد لإنشاء روابط بناءً على الاسم)
      */
@@ -60,7 +62,7 @@ class Route
      *
      * @return callable|array
      */
-    public function getCallback()
+    public function getCallback(): callable|array
     {
         return $this->callback;
     }
@@ -70,7 +72,7 @@ class Route
      *
      * @return array|string
      */
-    public function getMethod()
+    public function getMethod(): array|string
     {
         return $this->method;
     }
@@ -84,6 +86,8 @@ class Route
     {
         return $this->uri;
     }
+
+
 
     /**
      * جلب اسم المسار
@@ -101,7 +105,7 @@ class Route
      * @param string|null $key اسم المتغير
      * @return mixed مصفوفة المتغيرات كاملة أو القيمة المحددة
      */
-    public function getParam(string $key = null)
+    public function getParam(string $key = null): mixed
     {
         if ($key !== null) {
             return $this->params[$key] ?? null;
@@ -158,7 +162,7 @@ class Route
      * @param string|array $middlewares
      * @return self
      */
-    public function middleware($middlewares): self
+    public function middleware(array|string $middlewares): self
     {
         $this->middlewares = array_merge($this->middlewares, (array) $middlewares);
         return $this;

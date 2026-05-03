@@ -28,9 +28,9 @@ class Request
     protected $_server;
 
     /**
-     * @var Route كائن المسار الحالي المطابق للطلب
+     * @var Route|null كائن المسار الحالي المطابق للطلب
      */
-    protected Route $route;
+    protected ?Route $route = null;
 
     /**
      * @var array|null كاش للمدخلات لمنع إعادة معالجتها أكثر من مرة
@@ -65,9 +65,9 @@ class Request
     /**
      * الحصول على كائن المسار المطابق الحالي
      * 
-     * @return Route
+     * @return Route|null
      */
-    public function route()
+    public function route(): ?Route
     {
         return $this->route;
     }
@@ -77,7 +77,7 @@ class Request
      * 
      * @return Session
      */
-    public function getSession()
+    public function getSession(): Session
     {
         return new Session();
     }
@@ -287,19 +287,19 @@ class Request
         return $this->isMethod('delete');
     }
 
-    public function isHttps()
+    public function isHttps(): bool
     {
-        return $this->server('HTTPS') ? true : false;
+        return (bool) $this->server('HTTPS');
     }
 
-    public function isHttp()
+    public function isHttp(): bool
     {
         return !$this->isHttps();
     }
 
-    public function isAjax()
+    public function isAjax(): bool
     {
-        return (!empty($this->server('HTTP_X_REQUESTED_WITH')) && strtolower($this->server('HTTP_X_REQUESTED_WITH')) == 'xmlhttprequest');
+        return (!empty($this->server('HTTP_X_REQUESTED_WITH')) && strtolower((string) $this->server('HTTP_X_REQUESTED_WITH')) === 'xmlhttprequest');
     }
 
     /**
@@ -308,7 +308,7 @@ class Request
      * 
      * @return string|false
      */
-    public function body()
+    public function body(): string|false
     {
         return file_get_contents("php://input");
     }
@@ -377,7 +377,7 @@ class Request
      * @param string $key اسم الحقل
      * @return mixed القيمة أو null
      */
-    public function input($key)
+    public function input(string $key): mixed
     {
         return $this->inputs()[$key] ?? null;
     }
@@ -386,7 +386,7 @@ class Request
      * خاصية سحرية تتيح جلب المتغيرات كأنها خصائص
      * مثال: $request->username بدل $request->input('username')
      */
-    public function __get($key)
+    public function __get(string $key): mixed
     {
         return $this->input($key) ?? null;
     }
@@ -397,7 +397,7 @@ class Request
      * 
      * @return string|null
      */
-    public function csrfToken()
+    public function csrfToken(): ?string
     {
         return $this->input('csrf_token')
             ?: $this->header('X-CSRF-TOKEN')
@@ -421,8 +421,8 @@ class Request
             $session->flash('errors', $validator->errors());
             $session->flash('old', $this->inputs());
 
-            $referer = $this->header('referer', '/');
-            header("Location: $referer");
+            $referer = Response::sanitizeRedirectUrl((string) $this->header('referer', '/'));
+            $this->app->getResponse()->redirect($referer);
             exit;
         }
 

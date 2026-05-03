@@ -70,12 +70,14 @@ class Application
 
         // تشغيل الجلسة مرة واحدة فقط في دورة حياة الطلب
         if (session_status() === PHP_SESSION_NONE) {
+            $this->configureSession();
             session_start();
         }
 
-        $this->request  = new Request($this);
+        $this->registerErrorHandling();
+        $this->request = new Request($this);
         $this->response = new Response();
-        $this->router   = new Router($this);
+        $this->router = new Router($this);
         $this->loadEnv();
         $this->loadViewAttr();
 
@@ -113,19 +115,43 @@ class Application
     }
 
     /**
+     * إعداد خيارات أمان الجلسة قبل بدء session_start()
+     */
+    private function configureSession(): void
+    {
+        if (session_status() !== PHP_SESSION_NONE) {
+            return;
+        }
+
+        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ($_SERVER['SERVER_PORT'] ?? null) === '443';
+
+        session_set_cookie_params([
+            'lifetime' => 0,
+            'path' => '/',
+            'domain' => $_SERVER['HTTP_HOST'] ?? '',
+            'secure' => $secure,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ]);
+
+        ini_set('session.use_strict_mode', '1');
+    }
+
+    /**
      * تحميل متغيرات البيئة من ملف .env وتخزينها في نظام الإعدادات
      */
     private function loadEnv(): void
     {
         $envFile = $this->basePath . '/.env';
-        
-        if (class_exists(\Dotenv\Dotenv::class)) {
+
+        if (class_exists('Dotenv\\Dotenv')) {
             $dotenv = \Dotenv\Dotenv::createImmutable($this->basePath);
             $dotenv->safeLoad();
         } elseif (file_exists($envFile)) {
             $this->loadEnvManually($envFile);
         }
-        
+
         Config::load($_ENV);
     }
 
@@ -146,6 +172,57 @@ class Application
                 $_ENV[trim($name)] = trim($value);
             }
         }
+    }
+
+    /**
+     * Register centralized error and exception handlers for the framework.
+     */
+    private function registerErrorHandling(): void
+    {
+        set_error_handler([$this, 'handleError']);
+        set_exception_handler([$this, 'handleException']);
+        register_shutdown_function([$this, 'handleShutdown']);
+    }
+
+    public function handleError(int $errno, string $errstr, string $errfile, int $errline): bool
+    {
+        if (!(error_reporting() & $errno)) {
+            return false;
+        }
+
+        throw new \ErrorException($errstr, 0, $errno, $errfile, $errline);
+    }
+
+    public function handleException(\Throwable $e): void
+    {
+        if (headers_sent($file, $line)) {
+            error_log("Exception after headers sent in {$file}:{$line} — {$e->getMessage()}");
+        }
+
+        $this->renderException($e);
+    }
+
+    public function handleShutdown(): void
+    {
+        $error = error_get_last();
+        if ($error === null) {
+            return;
+        }
+
+        $fatalTypes = [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR];
+        if (!in_array($error['type'], $fatalTypes, true)) {
+            return;
+        }
+
+        $exception = new \ErrorException(
+            $error['message'],
+            0,
+            $error['type'],
+            $error['file'],
+            $error['line']
+        );
+
+        $this->renderException($exception);
     }
 
     /**
@@ -422,7 +499,7 @@ class Application
 
     /**
      * تحميل وعرض صفحة خطأ كقالب
-     * يسمح للمطورين بتخصيص قوالب الأخطاء عن طريق إنشاء مجلد resources/views/errors/
+     * يسمح للمطورين بتخصيص قوالب الأخطاء عن طريق إنشاء مجلد resources/views/Exception/
      *
      * @param string $view اسم القالب (مثلاً '404', '500', 'exception')
      * @param array $data بيانات تمرر للقالب
@@ -431,10 +508,10 @@ class Application
     public function renderErrorPage(string $view, array $data = []): void
     {
         extract($data);
-        
-        $customView = $this->basePath . '/app/views/errors/' . $view . '.php';
-        $defaultView = __DIR__ . '/View/errors/' . $view . '.php';
-        
+
+        $customView = $this->basePath . '/app/views/Exception/' . $view . '.php';
+        $defaultView = __DIR__ . '/View/Exception/' . $view . '.php';
+
         if (file_exists($customView)) {
             require $customView;
         } elseif (file_exists($defaultView)) {
@@ -451,10 +528,16 @@ class Application
      */
     private function renderException(\Throwable $e): void
     {
+        $source = $this->detectExceptionSource($e);
+
         error_log(
-            'Framework Error: ' . $e->getMessage() .
-                ' in ' . $e->getFile() .
-                ' on line ' . $e->getLine()
+            sprintf(
+                '%s: %s in %s on line %d',
+                $source,
+                $e->getMessage(),
+                $e->getFile(),
+                $e->getLine()
+            )
         );
 
         http_response_code(500);
@@ -469,6 +552,22 @@ class Application
             return;
         }
 
-        $this->renderErrorPage('exception', ['e' => $e]);
+        $this->renderErrorPage('exception', [
+            'e' => $e,
+            'errorSource' => $source,
+        ]);
+    }
+
+    private function detectExceptionSource(\Throwable $e): string
+    {
+        if (str_starts_with($e::class, 'yurni\\')) {
+            return 'Framework error';
+        }
+
+        if (str_contains($e->getFile(), __DIR__)) {
+            return 'Framework internal error';
+        }
+
+        return 'Application error';
     }
 }

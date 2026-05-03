@@ -130,7 +130,7 @@ abstract class Model
     public function firstOrCreate(array $conditions, array $values = []): array
     {
         $record = $this->applyConditions($this->query(), $conditions)->first();
-        
+
         if ($record !== null) {
             return $record;
         }
@@ -143,14 +143,14 @@ abstract class Model
     public function updateOrCreate(array $conditions, array $values = []): array
     {
         $record = $this->applyConditions($this->query(), $conditions)->first();
-        
+
         if ($record === null) {
             $id = $this->create([...$conditions, ...$values]);
             return $this->findOrFail($id);
         }
 
         $primaryKey = $record[$this->getPrimaryKey()] ?? null;
-        
+
         if ($primaryKey) {
             $this->updateById($primaryKey, $values);
             return $this->findOrFail($primaryKey);

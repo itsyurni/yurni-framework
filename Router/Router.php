@@ -43,8 +43,8 @@ class Router
      */
     public function __construct(Application $app)
     {
-        $this->app      = $app;
-        $this->request  = $this->app->request;
+        $this->app = $app;
+        $this->request = $this->app->request;
         $this->response = $this->app->response;
 
         // استجابة افتراضية في حالة عدم العثور على المسار
@@ -69,7 +69,7 @@ class Router
     public function register($method, string $uri, $action): Route
     {
         $routeUri = $this->routeToRegex($uri);
-        $route    = new Route($method, $routeUri, $action);
+        $route = new Route($method, $routeUri, $action);
 
         $this->routes[] = $route;
         return $route;
@@ -201,7 +201,7 @@ class Router
      */
     public function resolve()
     {
-        $path   = $this->request->getPath();
+        $path = $this->request->getPath();
         $method = $this->request->getMethod();
 
         $route = $this->findRoute($path, $method);
