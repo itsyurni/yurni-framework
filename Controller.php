@@ -9,34 +9,34 @@ use yurni\Http\Response;
 use yurni\Database\QueryBuilder;
 
 /**
- * الكلاس الأساسي للمتحكمات (Base Controller)
- * يوفّر الوصول إلى التطبيق وطبقة Query Builder بشكل مباشر داخل المتحكم.
+ * Base Controller Class
+ * Provides direct access to the application instance and Query Builder within your controllers.
  */
 class Controller {
     
     /**
-     * @var Application كائن التطبيق الأساسي
+     * @var Application Core application instance
      */
     public Application $app;
 
     /**
-     * @var Request كائن الطلب الحالي
+     * @var Request Current request object
      */
     public Request $request;
 
     /**
-     * @var Response كائن الاستجابة
+     * @var Response Response object
      */
     public Response $response;
 
     /**
-     * @var Db كائن الاتصال بقاعدة البيانات
+     * @var Db Database connection instance
      */
     protected Db $db;
 
     /**
-     * منشئ الكلاس (Constructor)
-     * يتم حقن كائن التطبيق تلقائياً عبر حاوية الـ Dependency Injection
+     * Controller constructor.
+     * The application instance is automatically injected via the Dependency Injection Container.
      * 
      * @param Application $app
      */
@@ -69,24 +69,24 @@ class Controller {
     }
 
     /**
-     * معالجة وعرض قالب HTML
-     * تقوم بدمج البيانات الممررة مع المتغيرات الأساسية (مثل معلومات المسار) وتمريرها لمحرك القوالب.
+     * Process and render an HTML template.
+     * Merges passed data with global variables and route information before passing it to the template engine.
      * 
-     * @param string $view اسم القالب (مثال: 'home' أو 'users.index')
-     * @param array $args مصفوفة البيانات التي سيتم عرضها في القالب
-     * @return string كود الـ HTML النهائي
+     * @param string $view Template name (e.g., 'home' or 'users.index')
+     * @param array $args Data array to be displayed in the template
+     * @return string Final HTML output
      */
     public function render(string $view, array $args = []): string
     {
-        // إضافة معلومات المسار الحالي (Route) للمتغيرات المتاحة في القالب
+        // Add current route information to the view attributes
         $this->app->setViewAttr([
             "route" => $this->request->route()
         ]);
         
-        // دمج البيانات الممررة من المستخدم مع المتغيرات العامة
+        // Merge user-passed data with global attributes
         $this->app->setViewAttr($args);
   
-        // معالجة القالب وإرجاع الكود
+        // Render the template and return output
         return View::render($view, $this->app->getViewAttr());
     }
 }

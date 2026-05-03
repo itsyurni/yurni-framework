@@ -1,75 +1,84 @@
-# الأمان في Yurni
+# 🔒 Security in Yurni
 
-## حماية CSRF
+Security is a core priority for the **Yurni Framework**. We provide several built-in mechanisms to protect your application from common web vulnerabilities like CSRF, Session Hijacking, and malicious file uploads.
 
-Yurni يقدم حماية CSRF مدمجة عبر `yurni\Security\Csrf`.
+---
 
-### إدراج حقل CSRF في النموذج
+## 🛡️ CSRF Protection
 
-```php
+Cross-Site Request Forgery (CSRF) is prevented using the `yurni\Security\Csrf` class. Yurni generates a unique token for every session that must be submitted with state-changing requests (POST, PUT, PATCH, DELETE).
+
+### Adding the CSRF Field to Forms
+Use the helper function to insert a hidden input field into your HTML forms:
+```html
 <form method="POST" action="/submit">
     <?= csrf_field() ?>
     <input name="name" />
 </form>
 ```
 
-### الحصول على التوكن مباشرة
-
-```php
-$token = csrf_token();
-```
-
-### استخدام Middleware
-
+### Verifying the Token
+Yurni provides a dedicated `csrf` middleware. It is highly recommended to apply this to all non-GET routes.
 ```php
 $app->post('/submit', [FormController::class, 'submit'])->middleware('csrf');
 ```
+*Note: The middleware automatically checks for the token in either the form inputs or the `X-CSRF-TOKEN` request header.*
 
-### التحقق الآلي
+---
 
-الـ Middleware يتحقق من التوكن المرسل عبر `POST` أو رؤوس `X-CSRF-TOKEN`.
+## 📂 Secure File Uploads
 
-## رفع الملفات الآمن
+Handling user-uploaded files is inherently risky. The `yurni\Http\FileUpload` class automates several safety checks:
+- Verifies files were uploaded via `HTTP POST`.
+- Validates real MIME types using `finfo`, not just extensions.
+- Blocks execution-capable extensions (e.g., `.php`, `.exe`, `.sh`).
+- Prevents file overwriting unless explicitly requested.
 
-الكلاس `yurni\Http\FileUpload` يتحقق من:
-
-- أن الملف رفع عبر `is_uploaded_file()`
-- أن حالة `UPLOAD_ERR_OK`
-- نوع MIME الحقيقي عبر `finfo`
-- امتدادات ممنوعة (`php`, `exe`, `sh`, `bat`, وغيرها)
-- يمنع إعادة كتابة الملفات إذا كان الملف موجودًا
-
-### مثال
-
+### Example Usage
 ```php
 $file = $request->file('avatar');
 
 if ($file && $file->isValid()) {
-    $file->validate(['image/jpeg', 'image/png'], 2048, ['jpg', 'png'])
-         ->moveWithUniqueName('public/uploads');
+    $file->validate(
+        allowedTypes: ['image/jpeg', 'image/png'], 
+        maxSize: 2048, // KB
+        allowedExtensions: ['jpg', 'png']
+    )->moveWithUniqueName('public/uploads');
 }
 ```
 
-## التعامل مع الجلسات securely
+---
 
-- `session()` يساعدك على الوصول إلى الجلسة بسهولة.
-- الكوكي يُنشأ مع `HttpOnly` و `SameSite=Lax` و `secure` عند توفر HTTPS.
-- يمكنك استدعاء `session()->regenerate()` لمنع هجمات تثبيت الجلسات.
+## 🔑 Session Security
 
-## مدخلات المستخدم
+Yurni hardens standard PHP sessions with sensible defaults:
+- **HttpOnly**: Cookies are inaccessible via JavaScript.
+- **SameSite=Lax**: Protects against CSRF in cross-site contexts.
+- **Secure**: Cookies are only sent over HTTPS (when detected).
 
-- `Request` لا ينقّي المدخلات تلقائيًا، لأن عملية التحقق والتنقية مسؤولية طبقة الأعمال.
-- استخدم `Validator` للتأكد من قواعد البيانات.
+> [!IMPORTANT]
+> To prevent Session Fixation attacks, always call `session()->regenerate()` after a user logs in.
 
-## تهيئة إعدادات الأمان
+---
 
-يمكنك تعديل بعض الإعدادات عبر `Config` أو `.env`:
+## 📝 User Input Handling
 
-```php
-Config::set('view_allow_php', false);
-Config::set('APP_DEBUG', false);
-```
+- **Sanitization**: Use `$request->sanitizeString()` or `$request->sanitizeEmail()` to clean raw input.
+- **Validation**: Use the `Request::validate()` method to ensure data conforms to expected patterns before processing.
 
-## نصيحة
+---
 
-اجعل `APP_DEBUG=false` في الإنتاج وخصص صفحات خطأ آمنة بدلاً من عرض تفاصيل الاستثناءات للمستخدم.
+## ⚙️ Production Hardening
+
+When deploying your application, ensure these settings are configured in your `.env` file:
+
+| Setting | Recommendation | Reason |
+|---------|----------------|--------|
+| `APP_DEBUG` | `false` | Prevents exposing sensitive stack traces to users. |
+| `view_allow_php` | `false` | Disables raw PHP execution within templates. |
+| `DB_PASS` | Strong Password | Use unique, long passwords for database access. |
+
+---
+
+## 💡 Best Practice
+Always define custom error pages in `app/views/Exception/` to hide system details from end-users while providing a professional interface for errors.

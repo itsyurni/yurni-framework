@@ -1,93 +1,89 @@
-# HTTP Helper Classes
+# 📨 HTTP Helper Classes
 
-## Request
+Yurni provides a suite of classes to handle the standard HTTP request-response cycle, including request parsing, response generation, and session management.
 
-كلاس `yurni\Http\Request` يجمع جميع بيانات الطلب ويجعلها سهلة الوصول.
+---
 
-### الطرق الأساسية
+## 📥 Request
 
-- `getPath()` — يعيد مسار الطلب بعد تنظيفه.
-- `getMethod()` — طريقة الطلب الحالية.
-- `header(string $key, $default = null)` — الحصول على هيدر.
-- `server(string $key)` — الحصول على متغير السيرفر.
-- `body()` — نص جسم الطلب الأصلي `php://input`.
-- `inputs()` — جميع المدخلات من `GET`, `POST`, JSON body.
-- `input(string $key)` — قيمة مدخلة معينة.
+The `yurni\Http\Request` class encapsulates all incoming data, providing a clean API to access headers, inputs, and server information.
 
-### حالة الطلب
+### Core Retrieval Methods
+- `getPath()`: Returns the cleaned request URI path.
+- `getMethod()`: Returns the current HTTP method (GET, POST, etc.).
+- `header(string $key, $default = null)`: Retrieves a specific request header.
+- `input(string $key, $default = null)`: Retrieves a value from GET, POST, or JSON body.
+- `inputs()`: Returns an associative array of all input data.
+- `body()`: Returns the raw request body string (useful for raw JSON payloads).
 
-- `isGet()`
-- `isPost()`
-- `isPut()`
-- `isPatch()`
-- `isDelete()`
-- `isHttps()`
-- `isAjax()`
+### State Detection
+Check the status or type of the incoming request:
+- `isGet()`, `isPost()`, `isPut()`, `isPatch()`, `isDelete()`
+- `isHttps()`: Checks if the request was made over a secure connection.
+- `isAjax()`: Detects if the request is an `XMLHttpRequest`.
 
-### CSRF
-
-- `csrfToken()` — قراءة التوكن من `input` أو رؤوس الطلب.
-
-### التحقق
-
+### Data Validation
+The `validate()` method provides a quick way to enforce rules on incoming data.
 ```php
 $validated = $request->validate([
-    'name' => 'required|string',
-    'email' => 'required|email',
+    'username' => 'required|string|min:3',
+    'email'    => 'required|email',
 ]);
 ```
+*Note: If validation fails, Yurni automatically stores errors in the session and redirects the user back to the previous page.*
 
-إذا فشل التحقق، يتم حفظ الأخطاء والبيانات القديمة في الجلسة ثم إعادة التوجيه.
+---
 
-## Response
+## 📤 Response
 
-كلاس `yurni\Http\Response` يسهل إعداد الاستجابة للمستخدم.
+The `yurni\Http\Response` class simplifies the process of sending data back to the client with the correct headers and status codes.
 
-### دوال مهمة
+### Common Response Types
+- **HTML**: `return $response->html('<h1>Hello World</h1>', 200);`
+- **JSON**: `return $response->json(['status' => 'success'], 201);`
+- **Redirect**: `return $response->redirect('/dashboard');`
 
-- `html(string $content, int $status = 200)`
-- `json(array $data = [], int $status = 200)`
-- `redirect(string $url, int $status = 302, bool $allowExternal = false)`
-- `setHeader(string $type, string $val)`
-- `setContentType(string $val)`
-- `body()` — الحصول على محتوى الاستجابة.
-
-### مثال JSON
-
+### Customizing the Response
 ```php
-return $this->response->json(['success' => true]);
+$response->setHeader('X-Custom-Header', 'Value')
+         ->setContentType('application/pdf')
+         ->setStatusCode(200)
+         ->setBody($content);
 ```
 
-### إعادة التوجيه آمن
+---
 
-`redirect()` يتحقق من أن الرابط غير خارجي أو يسمح بالروابط الداخلية فقط ما لم يُحدد `allowExternal = true`.
+## 🎯 Session Management
 
-## Session
+The `yurni\Http\Session` class provides a clean wrapper around PHP's native sessions, adding features like flash messages.
 
-`yurni\Http\Session` يوفر إدارة بسيطة للجلسة.
-
-### أمثلة
-
+### Standard Operations
 ```php
-session('name', 'أحمد');
-$value = session('name');
+// Using the global helper
+session('user_id', 42);       // Set
+$id = session('user_id');     // Get
+
+// Check if key exists
+if ($session->has('user_id')) { ... }
+
+// Remove a specific key
+$session->remove('user_id');
+
+// Clear all session data
+$session->destroy();
 ```
 
-### Flash messages
-
+### Flash Messages
+Flash messages are stored in the session and automatically deleted after they are displayed once.
 ```php
-flash('success', 'تم الحفظ بنجاح');
-$message = flash('success');
+// Set a flash message
+flash('message', 'Profile updated successfully!');
+
+// Retrieve a flash message (it will be deleted after this)
+$msg = flash('message');
 ```
 
-### أدوات الجلسة
+---
 
-- `set(string $key, mixed $value)`
-- `get(string $key, mixed $default = null)`
-- `has(string $key)`
-- `remove(string $key)`
-- `flash(string $key, mixed $message)`
-- `getFlash(string $key, mixed $default = null)`
-- `hasFlash(string $key)`
-- `regenerate(bool $deleteOld = true)`
-- `destroy()`
+## 💡 Pro Tip
+In any Yurni Controller, you can access these instances directly via `$this->request` and `$this->response`.

@@ -8,67 +8,65 @@ use yurni\Http\Request;
 use yurni\Http\Response;
 
 /**
- * الكلاس الأساسي للإطار (Application)
- * يمثل نقطة الدخول (Entry Point) ويدير دورة حياة الطلبات والاستجابات.
+ * Application Core Class
+ * Represents the entry point and manages the lifecycle of requests and responses.
  */
 class Application
 {
     /**
-     * @var Application|null نسخة الـ Singleton من التطبيق
+     * @var Application|null Singleton instance of the application
      */
     protected static ?Application $instance = null;
 
     /**
-     * @var Router كائن الموجه المسؤول عن الروابط
+     * @var Router Router instance responsible for URL mapping
      */
     protected Router $router;
 
     /**
-     * @var string المسار الأساسي للمشروع
+     * @var string Base path of the project
      */
     protected string $basePath;
 
     /**
-     * @var Request كائن الطلب الحالي
+     * @var Request Current request object
      */
     public Request $request;
 
     /**
-     * @var Response كائن الاستجابة
+     * @var Response Response object
      */
     public Response $response;
 
     /**
-     * @var array البرمجيات الوسيطة (Middlewares) المسجلة في التطبيق
+     * @var array Registered Middlewares in the application
      */
     protected array $middlewares = [];
 
     /**
-     * @var array البيانات التي سيتم تمريرها بشكل افتراضي لمحرك القوالب
+     * @var array Default data passed to the template engine
      */
     protected array $viewAttr = [];
 
-
-
     /**
-     * @var Container|null نسخة Singleton من حاوية الـ DI لإعادة استخدامها
+     * @var Container|null Singleton instance of the DI Container
      */
     private ?Container $containerInstance = null;
 
     /**
-     * منشئ الكلاس الأساسي
-     * يقوم بتهيئة كائنات الطلب، الاستجابة، الموجه وإعداد بيئة العمل
+     * Application constructor.
+     * Initializes request, response, router, and environment.
      *
-     * @param string $basePath المسار الأساسي للمشروع (اختياري — يُكتشف تلقائياً إن لم يُمرَّر)
+     * @param string $basePath Base project path (optional — auto-detected if empty)
      */
     public function __construct(string $basePath = '')
     {
         self::$instance = $this;
 
-        // تحديد المسار الأساسي للمشروع
+        // Determine project base path
         $this->basePath = $basePath !== '' ? realpath($basePath) : $this->detectBasePath();
 
-        // تشغيل الجلسة مرة واحدة فقط في دورة حياة الطلب
+        // Start session only once per request lifecycle
         if (session_status() === PHP_SESSION_NONE) {
             $this->configureSession();
             session_start();
@@ -81,41 +79,35 @@ class Application
         $this->loadEnv();
         $this->loadViewAttr();
 
-        // تسجيل CSRF كـ Middleware جاهز للاستخدام الاختياري
+        // Register CSRF as a ready-to-use middleware
         $this->setMiddleware('csrf', \yurni\Security\Csrf::class);
     }
 
     /**
-     * اكتشاف المسار الأساسي للمشروع تلقائياً
-     * يصعد من مجلد الملف الذي استدعى new Application()
-     * حتى يجد جذر المشروع (حيث يوجد composer.json أو .env)
+     * Automatically detect the project base path.
+     * Searches upwards from the caller file until composer.json or .env is found.
      *
      * @return string
      */
     private function detectBasePath(): string
     {
-        // نجلب مسار الملف الذي استدعى new Application() مباشرةً
         $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
-
-        // [0] = هذا الملف (Application.php) — [1] = الملف الذي كتب new Application()
         $callerFile = $caller[1]['file'] ?? __FILE__;
         $dir = dirname($callerFile);
 
-        // نصعد في شجرة المجلدات حتى نجد composer.json أو .env
         $current = $dir;
-        while ($current !== dirname($current)) { // توقف عند جذر نظام الملفات
+        while ($current !== dirname($current)) {
             if (file_exists($current . '/composer.json') || file_exists($current . '/.env')) {
                 return realpath($current);
             }
             $current = dirname($current);
         }
 
-        // fallback: مجلد الملف المستدعي مباشرةً
         return realpath($dir);
     }
 
     /**
-     * إعداد خيارات أمان الجلسة قبل بدء session_start()
+     * Configure session security options before session_start().
      */
     private function configureSession(): void
     {
@@ -139,7 +131,7 @@ class Application
     }
 
     /**
-     * تحميل متغيرات البيئة من ملف .env وتخزينها في نظام الإعدادات
+     * Load environment variables from .env file.
      */
     private function loadEnv(): void
     {
@@ -156,9 +148,9 @@ class Application
     }
 
     /**
-     * قراءة ملف .env يدوياً في حال عدم وجود حزمة vlucas/phpdotenv
+     * Manually load .env file if phpdotenv is not installed.
      *
-     * @param string $envFile مسار الملف
+     * @param string $envFile
      */
     private function loadEnvManually(string $envFile): void
     {
@@ -226,7 +218,7 @@ class Application
     }
 
     /**
-     * تهيئة المتغيرات الأساسية المتاحة دائماً داخل قوالب العرض (Views)
+     * Initialize core variables available in all Views.
      */
     private function loadViewAttr(): void
     {
@@ -238,9 +230,9 @@ class Application
     }
 
     /**
-     * إضافة بيانات جديدة لتكون متاحة داخل قوالب العرض
+     * Add new data to be available in Views.
      *
-     * @param array $args مصفوفة البيانات
+     * @param array $args
      * @return self
      */
     public function setViewAttr(array $args = []): self
@@ -252,7 +244,7 @@ class Application
     }
 
     /**
-     * الحصول على البيانات المتاحة لقوالب العرض
+     * Get variables available for Views.
      *
      * @return array
      */
@@ -262,10 +254,10 @@ class Application
     }
 
     /**
-     * تسجيل برمجية وسيطة (Middleware) جديدة
+     * Register a new Middleware.
      *
-     * @param string                 $name     اسم الـ Middleware
-     * @param callable|string|array  $callable الكلاس أو الدالة المسؤولة
+     * @param string                 $name     Middleware name
+     * @param callable|string|array  $callable Implementation
      */
     public function setMiddleware(string $name, $callable): void
     {
@@ -273,10 +265,10 @@ class Application
     }
 
     /**
-     * تنفيذ والحصول على الـ Middleware المطلوب
-     * يدعم: Closure, [Class, method], Class::class (invokable)
+     * Execute and retrieve the requested Middleware.
+     * Supports: Closure, [Class, method], Class::class (invokable)
      *
-     * @param string $name اسم الـ Middleware
+     * @param string $name Middleware name
      * @return mixed
      */
     public function getMiddleware(string $name): mixed
@@ -287,7 +279,6 @@ class Application
 
         $middleware = $this->middlewares[$name];
 
-        // إذا كان string (class name) نحوله لكائن قابل للاستدعاء __invoke
         if (is_string($middleware) && class_exists($middleware)) {
             $middleware = [new $middleware(), '__invoke'];
         }
@@ -296,9 +287,9 @@ class Application
     }
 
     /**
-     * التحقق من وجود الـ Middleware
+     * Check if a Middleware exists.
      *
-     * @param string $name اسم الـ Middleware
+     * @param string $name
      * @return bool
      */
     public function hasMiddleware(string $name): bool
@@ -307,8 +298,7 @@ class Application
     }
 
     /**
-     * الحصول على حاوية الحقن التلقائي (Dependency Injection Container)
-     * تعتمد نمط Singleton لضمان استخدام نسخة واحدة فقط طوال دورة حياة الطلب.
+     * Get the Dependency Injection Container instance.
      *
      * @return Container
      */
@@ -317,7 +307,7 @@ class Application
         if ($this->containerInstance === null) {
             $this->containerInstance = new Container();
 
-            // تسجيل الكائنات كـ Singletons لمنع إعادة إنشائها
+            // Register instances as Singletons
             $this->containerInstance->instance(get_class($this->response), $this->response);
             $this->containerInstance->instance(get_class($this->request), $this->request);
             $this->containerInstance->instance(get_class($this), $this);
@@ -327,7 +317,7 @@ class Application
                 static fn(Container $c): QueryBuilder => Db::getInstance()->query()
             );
 
-            // حقن بأسماء مختصرة لدعم الـ Closures بدون Type Hinting
+            // Inject with short names for Closures
             $this->containerInstance->injectArgs([
                 get_class($this->response) => $this->response,
                 get_class($this->request) => $this->request,
@@ -343,7 +333,7 @@ class Application
     }
 
     /**
-     * الحصول على كائن الموجه (Router)
+     * Get the Router instance.
      *
      * @return Router
      */
@@ -353,7 +343,7 @@ class Application
     }
 
     /**
-     * الحصول على كائن الاستجابة (Response)
+     * Get the Response object.
      *
      * @return Response
      */
@@ -363,7 +353,7 @@ class Application
     }
 
     /**
-     * الحصول على كائن الطلب (Request)
+     * Get the Request object.
      *
      * @return Request
      */
@@ -373,7 +363,7 @@ class Application
     }
 
     /**
-     * الحصول على المسار الأساسي للمشروع
+     * Get the project base path.
      *
      * @return string
      */
@@ -383,7 +373,7 @@ class Application
     }
 
     /**
-     * الحصول على نسخة التطبيق الحالية (Singleton)
+     * Get the current Application instance (Singleton).
      *
      * @return Application|null
      */
@@ -393,14 +383,14 @@ class Application
     }
 
     /********************************************************************************
-     * طرق التوجيه المختصرة (Router Proxy Methods)
+     * Router Proxy Methods
      *******************************************************************************/
 
     /**
-     * تسجيل مسار من نوع GET
+     * Register a GET route.
      *
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function get(string $path, $callback): \yurni\Router\Route
@@ -409,10 +399,10 @@ class Application
     }
 
     /**
-     * تسجيل مسار من نوع POST
+     * Register a POST route.
      *
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function post(string $path, $callback): \yurni\Router\Route
@@ -421,10 +411,10 @@ class Application
     }
 
     /**
-     * تسجيل مسار من نوع PATCH
+     * Register a PATCH route.
      *
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function patch(string $path, $callback): \yurni\Router\Route
@@ -433,10 +423,10 @@ class Application
     }
 
     /**
-     * تسجيل مسار من نوع PUT
+     * Register a PUT route.
      *
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function put(string $path, $callback): \yurni\Router\Route
@@ -445,10 +435,10 @@ class Application
     }
 
     /**
-     * تسجيل مسار من نوع DELETE
+     * Register a DELETE route.
      *
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function delete(string $path, $callback): \yurni\Router\Route
@@ -457,10 +447,10 @@ class Application
     }
 
     /**
-     * تسجيل مسار يقبل جميع طرق الطلبات (GET, POST, PUT, DELETE, PATCH)
+     * Register a route that responds to any HTTP method.
      *
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function any(string $path, $callback): \yurni\Router\Route
@@ -469,11 +459,11 @@ class Application
     }
 
     /**
-     * تسجيل مسار يقبل طرق محددة فقط يتم تمريرها كمصفوفة
+     * Register a route for specific HTTP methods.
      *
-     * @param  array                 $methods  مصفوفة بالطرق المسموحة
-     * @param  string                $path     مسار الرابط
-     * @param  callable|string|array $callback الدالة أو المتحكم المطلوب تنفيذه
+     * @param  array                 $methods
+     * @param  string                $path
+     * @param  callable|string|array $callback
      * @return \yurni\Router\Route
      */
     public function only(array $methods, string $path, $callback): \yurni\Router\Route
@@ -481,10 +471,8 @@ class Application
         return $this->router->register($methods, $path, $callback);
     }
 
-
-
     /**
-     * تشغيل التطبيق (معالجة الطلب وإرجاع الاستجابة)
+     * Run the application (resolve request and return response).
      *
      * @return void
      */
@@ -498,11 +486,10 @@ class Application
     }
 
     /**
-     * تحميل وعرض صفحة خطأ كقالب
-     * يسمح للمطورين بتخصيص قوالب الأخطاء عن طريق إنشاء مجلد resources/views/Exception/
+     * Load and render an error page as a template.
      *
-     * @param string $view اسم القالب (مثلاً '404', '500', 'exception')
-     * @param array $data بيانات تمرر للقالب
+     * @param string $view Template name (e.g., '404', '500', 'exception')
+     * @param array $data Data passed to the view
      * @return void
      */
     public function renderErrorPage(string $view, array $data = []): void
@@ -522,7 +509,7 @@ class Application
     }
 
     /**
-     * معالجة الاستثناءات وطباعة شاشة الخطأ
+     * Handle exceptions and render the error screen.
      *
      * @param \Throwable $e
      */

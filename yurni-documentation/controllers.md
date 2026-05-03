@@ -1,8 +1,12 @@
-# المتحكمات (Controllers)
+# 🎮 Controllers
 
-المتحكم هو نقطة الدخول لمنطق التطبيق. يستخدم Yurni كلاس أساسي `yurni\Controller` يوفر لك وظائف شائعة.
+Controllers act as the brain of your application, handling incoming requests and returning appropriate responses. By extending the base `yurni\Controller` class, you gain access to a suite of powerful utility methods.
 
-## إنشاء متحكم جديد
+---
+
+## 🏗️ Creating a Controller
+
+Controllers are typically stored in the `app/Controllers` directory. Here is a basic example:
 
 ```php
 <?php
@@ -14,96 +18,107 @@ use yurni\Http\Response;
 
 class UserController extends Controller
 {
+    /**
+     * Display a listing of users.
+     */
     public function index(): string
     {
+        // Fetch users using the built-in table helper
         $users = $this->table('users')->get();
+        
+        // Render a template with data
         return $this->render('users.index', ['users' => $users]);
     }
 }
 ```
 
-## أهم الدوال المتاحة في `Controller`
+---
 
-### `render(string $view, array $args = [])`
+## 🛠️ Core Controller Methods
 
-تعرض قالبًا باستخدام محرك القوالب.
+The base `Controller` provides several helpers to streamline your workflow:
 
+### `render(string $view, array $data = [])`
+Renders a view template using the framework's template engine.
 ```php
-return $this->render('users.show', ['user' => $user]);
+return $this->render('profile.show', ['user' => $user]);
 ```
 
-### `db(): Db`
-
-يُرجع كائن قاعدة البيانات.
-
+### `db()`
+Returns the singleton instance of the database connection.
 ```php
 $user = $this->db()->table('users')->first();
 ```
 
-### `query(): QueryBuilder`
-
-بدء استعلام عبر Query Builder.
-
+### `table(string $tableName)`
+A shortcut to start a Query Builder instance on a specific table.
 ```php
-$posts = $this->query()->table('posts')->where('published', 1)->get();
+$posts = $this->table('posts')->where('active', 1)->get();
 ```
 
-### `table(string $table): QueryBuilder`
-
-بدء استعلام على جدول محدد بسرعة.
-
+### `transaction(callable $callback)`
+Wraps database operations in a transaction to ensure data integrity.
 ```php
-$this->table('users')->where('active', 1)->get();
-```
-
-### `transaction(callable $callback): mixed`
-
-تنفيذ مجموعة عمليات قاعدة بيانات داخل معاملة.
-
-```php
-$this->transaction(function () use ($data) {
-    $this->table('accounts')->insert($data);
-    // ... عمليات أخرى
+$this->transaction(function () use ($userData) {
+    $this->table('users')->insert($userData);
+    $this->table('logs')->insert(['action' => 'user_created']);
 });
 ```
 
-## مثال CRUD كامل
+---
+
+## 💉 Automatic Dependency Injection
+
+The Yurni DI Container automatically injects common objects into your controller methods based on their type-hints. You can also mix these with dynamic route parameters.
+
+```php
+public function update(Request $request, Response $response, int $id): Response
+{
+    $name = $request->input('name');
+    
+    $this->table('users')->where('id', $id)->update(['name' => $name]);
+    
+    return $response->redirect('/users');
+}
+```
+
+---
+
+## 📝 Full CRUD Example
+
+Here is how you might handle a store and show operation:
 
 ```php
 public function store(Request $request): Response
 {
+    // Validate incoming request
     $validated = $request->validate([
-        'name' => 'required|string',
-        'email' => 'required|email',
+        'username' => 'required|string|min:3',
+        'email'    => 'required|email',
     ]);
 
     $this->table('users')->insert($validated);
+    
     return $this->response->redirect('/users');
 }
 
 public function show($id): string
 {
     $user = $this->table('users')->where('id', $id)->first();
+    
     if (!$user) {
-        http_response_code(404);
-        return 'المستخدم غير موجود';
+        $this->response->setStatusCode(404);
+        return 'User not found';
     }
+    
     return $this->render('users.show', ['user' => $user]);
 }
 ```
 
-## حقن التبعيات الآلية
+---
 
-يمكنك طلب `Request`, `Response`, أو كائنات أخرى في توقيع الدالة وسيستدعها الحاوية تلقائيًا:
+## 💡 Pro Tips
 
-```php
-public function update(Request $request, int $id): Response
-{
-    // ...
-}
-```
-
-## الملاحظات
-
-- `Controller` ينتقل بكائن `Request` و `Response` و `Db` تلقائيًا.
-- استخدم `render()` لعرض القوالب، و `response->json()` لردود API.
+- **API Responses**: For building APIs, use `$this->response->json([...])` instead of `render()`.
+- **Logic Separation**: Keep your controllers thin. Move complex business logic to Service classes or Models.
+- **Consistency**: Always return a string (for views) or a `Response` object for consistency.

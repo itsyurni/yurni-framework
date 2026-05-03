@@ -1,123 +1,108 @@
-# قاعدة البيانات و Query Builder
+# 🗄️ Database & Query Builder
 
-## `Db` - نقطة الدخول إلى قواعد البيانات
+The **Yurni Framework** offers a powerful and secure database abstraction layer. Whether you need to run raw SQL or build complex queries using a fluent interface, Yurni has you covered.
 
-### الحصول على الكائن
+---
 
+## 🏛️ The `Db` Class
+
+The `Db` class is the main entry point for all database interactions. It uses a singleton pattern to manage connections efficiently.
+
+### Getting the Instance
 ```php
 use yurni\Db;
 
 $db = Db::getInstance();
 ```
 
-### اختيار جدول سريعًا
-
+### Running Raw Queries
+If you need full control, you can execute raw SQL statements safely using parameter binding.
 ```php
+// Fetch multiple results
+$users = $db->select("SELECT * FROM users WHERE active = :status", ['status' => 1]);
+
+// Execute an update or delete (returns number of affected rows)
+$count = $db->affectingStatement("UPDATE users SET last_login = NOW() WHERE id = ?", [5]);
+
+// Run any other statement
+$db->statement("DROP TABLE IF EXISTS old_logs");
+```
+
+---
+
+## 🛠️ Fluent Query Builder
+
+The Query Builder provides a programmatic way to build SQL queries without writing raw strings. It automatically handles parameter binding to prevent SQL injection.
+
+### Basic Selection
+```php
+// Select all records from a table
 $users = $db->table('users')->get();
+
+// Select specific columns
+$emails = $db->table('users')->select('id', 'email')->get();
 ```
 
-### تنفيذ استعلامات مباشرة
-
+### Filtering with `WHERE`
 ```php
-$results = $db->select('SELECT * FROM users WHERE active = :active', ['active' => 1]);
-```
-
-```php
-$count = $db->affectingStatement('UPDATE users SET active = 0 WHERE id = :id', ['id' => 5]);
-```
-
-### إدراج وإرجاع ID
-
-```php
-$id = $db->table('users')->insertGetId([
-    'name' => 'محمد',
-    'email' => 'mohamed@example.com',
-]);
-```
-
-## Query Builder
-
-الكلاس `yurni\Database\QueryBuilder` يوفر استعلامات سلسة وآمنة.
-
-### بدائل SELECT
-
-```php
-$db->table('posts')->select('id', 'title')->get();
-```
-
-### شروط WHERE
-
-```php
-$query = $db->table('posts')
+$posts = $db->table('posts')
     ->where('status', 'published')
-    ->where('category', 'news');
-```
-
-### مسافات إضافية
-
-```php
-$db->table('users')
-    ->whereIn('role', ['admin', 'editor'])
-    ->whereBetween('created_at', ['2024-01-01', '2024-12-31'])
+    ->where('category', 'tech')
+    ->whereIn('user_id', [1, 2, 3])
+    ->whereBetween('views', [100, 500])
     ->get();
 ```
 
-### الانضمام (JOIN)
-
+### Table Joins
 ```php
-$db->table('posts')
+$posts = $db->table('posts')
     ->join('users', 'posts.user_id', '=', 'users.id')
-    ->select('posts.*', 'users.name')
+    ->select('posts.*', 'users.name as author_name')
     ->get();
 ```
 
-### ترتيب و حد و إزاحة
-
+### Ordering, Limits, and Offsets
 ```php
-$items = $db->table('products')
-    ->orderBy('price', 'desc')
+$recent = $db->table('posts')
+    ->orderBy('created_at', 'desc')
     ->limit(10)
     ->offset(20)
     ->get();
 ```
 
-### التمييز DISTINCT
+---
+
+## 🛡️ Security Features
+
+- **Prepared Statements**: All values passed to `where()`, `insert()`, or `update()` are automatically bound to prepared statements.
+- **Identifier Quoting**: Table and column names are automatically quoted to prevent conflicts with SQL reserved words.
+- **Sanitization**: Built-in protection against common injection vectors.
+
+---
+
+## ⚙️ Configuration
+
+Database settings are managed via your `.env` file. Yurni supports MySQL, PostgreSQL, and SQLite out of the box.
+
+| Key | Description | Example |
+|-----|-------------|---------|
+| `DB_DRIVER` | The database engine | `mysql`, `pgsql`, `sqlite` |
+| `DB_HOST` | Database host | `127.0.0.1` |
+| `DB_PORT` | Port number | `3306` |
+| `DB_NAME` | Database name | `my_app_db` |
+| `DB_USER` | Username | `root` |
+| `DB_PASS` | Password | `secret` |
+| `DB_CHARSET`| Character set | `utf8mb4` |
+
+---
+
+## 💡 Transactions
+
+Ensure data consistency by wrapping multiple operations in a transaction:
 
 ```php
-$categories = $db->table('posts')
-    ->distinct()
-    ->select('category')
-    ->get();
+$db->transaction(function ($db) {
+    $db->table('accounts')->where('id', 1)->decrement('balance', 100);
+    $db->table('accounts')->where('id', 2)->increment('balance', 100);
+});
 ```
-
-### استخدام الـ Query Builder في نموذج
-
-```php
-$users = User::query()->where('active', 1)->get();
-```
-
-### ملاحظات أمان
-
-- يتم ربط القيم تلقائيًا عبر Prepared Statements.
-- استخدم `where()` و `whereIn()` بدلًا من بناء الاستعلامات يدويًا.
-- اسماء الجداول والأعمدة يتم تغليفها تلقائيًا للحماية.
-
-## دعم قواعد بيانات متعددة
-
-يدعم `Db` بشكل افتراضي:
-
-- MySQL / MariaDB
-- PostgreSQL
-- SQLite
-
-المعلومات تُقرأ من `.env` عبر المفاتيح:
-
-- `DB_DRIVER`
-- `DB_HOST`
-- `DB_PORT`
-- `DB_NAME`
-- `DB_USER`
-- `DB_PASS`
-- `DB_CHARSET`
-- `DB_COLLATION`
-- `DB_TIMEZONE`

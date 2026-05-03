@@ -1,115 +1,109 @@
-# العرض ومحرك القوالب
+# 🎨 Views & Template Engine
 
-Yurni يقدم طبقة عرض خفيفة تدعم قوالب بامتداد `.php` مع علامات خاصة.
+The **Yurni Framework** features a fast and intuitive template engine that combines the power of PHP with a clean, readable syntax. It supports template inheritance, blocks, and automatic data escaping to keep your views clean and secure.
 
-## عرض قالب
+---
 
-```php
-return View::render('home', ['title' => 'الرئيسية']);
-```
+## 🚀 Rendering Views
 
-في المتحكم يمكنك استخدام:
+You can render views from your controllers or directly via the `View` class.
 
 ```php
-return $this->render('home', ['title' => 'الرئيسية']);
+// From a Controller
+return $this->render('home', ['title' => 'Home Page']);
+
+// Using the View class directly
+return yurni\View::render('home', ['title' => 'Home Page']);
 ```
 
-## قواعد القالب
+---
 
-### طباعة قيمة آمنة
+## 🛠️ Template Syntax
 
-```twig
-{{ username }}
-```
+Yurni uses a special tag syntax to simplify common PHP tasks.
 
-هذا يعادل:
+### Data Output
+- **Escaped Output**: Automatically sanitizes data to prevent XSS.
+  ```twig
+  {{ $username }}
+  ```
+- **Raw Output**: Use when you need to output HTML content.
+  ```twig
+  {{{ $htmlContent }}}
+  ```
 
-```php
-<?php echo htmlspecialchars((string)$username, ENT_QUOTES, 'UTF-8'); ?>
-```
+### Control Structures
+- **Conditionals**:
+  ```twig
+  {% if $user['active'] %}
+      Welcome back, {{ $user['name'] }}!
+  {% else %}
+      Your account is inactive.
+  {% endif %}
+  ```
+- **Loops**:
+  ```twig
+  {% foreach $posts as $post %}
+      <li>{{ $post['title'] }}</li>
+  {% endforeach %}
+  ```
 
-### طباعة raw بدون escaping
+### Inheritance & Composition
+- **Extending a Layout**:
+  ```twig
+  {% extends 'layouts/main' %}
+  ```
+- **Defining & Yielding Blocks**:
+  ```twig
+  {% block content %}
+      <h1>Page Content</h1>
+  {% endblock %}
+  
+  // In your layout:
+  {% yield content %}
+  ```
+- **Including Partials**:
+  ```twig
+  {% include 'partials/navbar' %}
+  ```
 
-```twig
-{{{ htmlContent }}}
-```
-
-### الشروط
-
-```twig
-{% if $user['active'] %}
-    مرحبًا {{ $user['name'] }}
-{% else %}
-    حسابك غير مفعل
-{% endif %}
-```
-
-### الحلقات
-
-```twig
-{% foreach $posts as $post %}
-    <li>{{ $post['title'] }}</li>
-{% endforeach %}
-```
-
-### الكتل والوراثة
-
-```twig
-{% block content %}
-    <h1>محتوى الصفحة</h1>
-{% endblock %}
-
-{% yield content %}
-```
-
-### تضمين قالب أو Extends
-
-```twig
-{% include 'partials/header' %}
-```
-
-### حماية نصية
-
+### Verbatim Block
+If you are using frontend frameworks like Vue or React, wrap their templates in `verbatim` to prevent Yurni from parsing them.
 ```twig
 {% verbatim %}
-    {{ this_will_not_be_escaped }}
+    <div>{{ vueVariable }}</div>
 {% endverbatim %}
 ```
 
-### تنفيذ PHP آمن
+---
 
-افتراضيًا، `view_allow_php` معطل. لتفعيل PHP الصريح في القوالب:
+## ⚙️ Configuration & Performance
 
-```env
-view_allow_php=true
-```
+Manage view behavior via your `.env` file for optimal performance in production.
 
-ثم استخدم:
+| Key | Description | Default |
+|-----|-------------|---------|
+| `views_path` | Directory for template files | `app/views` |
+| `views_cache_path` | Directory for compiled cache | `storage/cache` |
+| `view_cache` | Enable compiled template caching | `true` |
+| `view_optimize` | Minify compiled template output | `false` |
+| `view_allow_php` | Allow raw `<?php ?>` in templates | `false` |
 
-```twig
-{% php echo 'Hello'; %}
-```
+---
 
-## إعدادات العرض
+## 🌐 Global Variables
 
-القيم المدعومة في `.env` أو `Config`:
-
-- `views_path` — مسار قوالب العرض.
-- `views_cache_path` — مجلد تخزين القوالب المجمعة.
-- `view_cache` — تفعيل الكاش.
-- `view_optimize` — ضغط الكود المجمّع.
-- `view_allow_php` — تمكين تنفيذ تعابير PHP الداخلية.
-
-## تخزين متغيرات عامة
-
-يمكنك تمرير بيانات افتراضية لجميع القوالب عبر:
+You can make variables available to every single template without passing them manually in every `render()` call.
 
 ```php
-$app->setViewAttr(['appName' => 'Yurni']);
+// In your bootstrap/index.php
+$app->setViewAttr([
+    'appName' => 'Yurni Framework',
+    'version' => '1.0.0'
+]);
 ```
 
-ثم استخدامها في أي قالب:
-
+Then access them anywhere:
 ```twig
-{{ appName }}
+<footer>{{ appName }} v{{ version }}</footer>
 ```

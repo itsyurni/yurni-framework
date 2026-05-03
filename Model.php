@@ -9,8 +9,8 @@ use InvalidArgumentException;
 use yurni\Database\QueryBuilder;
 
 /**
- * الكلاس الأساسي للنماذج.
- * يوفر طبقة Model مريحة فوق Query Builder مع واجهة CRUD قياسية.
+ * Base Model Class.
+ * Provides a convenient Model layer over Query Builder with a standard CRUD interface.
  */
 abstract class Model
 {
@@ -117,7 +117,7 @@ abstract class Model
     }
 
     /**
-     * تطبيق مجموعة من الشروط على الاستعلام
+     * Apply a set of conditions to the query.
      */
     private function applyConditions(QueryBuilder $query, array $conditions): QueryBuilder
     {
@@ -251,7 +251,7 @@ abstract class Model
     }
 
     /**
-     * الحصول على الاسم القصير للكلاس (بدون Namespace)
+     * Get the short class name (without Namespace).
      */
     protected function getClassShortName(string $class): string
     {
@@ -261,7 +261,7 @@ abstract class Model
     }
 
     /**
-     * تحويل النص إلى صيغة snake_case
+     * Convert string to snake_case.
      */
     protected function snakeCase(string $value): string
     {

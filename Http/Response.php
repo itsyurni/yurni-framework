@@ -6,8 +6,8 @@ use JsonException;
 use RuntimeException;
 
 /**
- * كلاس الاستجابة (Response)
- * مسؤول عن إرسال المخرجات للمستخدم، سواء كانت HTML، JSON، أو حتى عمليات إعادة التوجيه (Redirect).
+ * Response Class
+ * Responsible for sending output to the user, whether it's HTML, JSON, or redirects.
  */
 class Response
 {
@@ -20,7 +20,7 @@ class Response
     protected ?string $body;
 
     /**
-     * منشئ الكلاس
+     * Response constructor.
      */
     public function __construct()
     {
@@ -29,7 +29,7 @@ class Response
     }
 
     /**
-     * تعيين كود حالة الـ HTTP (مثل 200, 404, 500)
+     * Set the HTTP status code (e.g., 200, 404, 500).
      * 
      * @param int $code
      * @return self
@@ -41,7 +41,7 @@ class Response
     }
 
     /**
-     * الحصول على كود حالة الـ HTTP الحالي
+     * Get the current HTTP status code.
      * 
      * @return int|null
      */
@@ -51,10 +51,10 @@ class Response
     }
 
     /**
-     * تعيين هيدر (Header) محدد للاستجابة
+     * Set a specific header for the response.
      * 
-     * @param string $type اسم الهيدر (مثال: Content-Type)
-     * @param string $val القيمة
+     * @param string $type Header name (e.g., Content-Type)
+     * @param string $val Header value
      * @return self
      */
     public function setHeader(string $type, string $val): self
@@ -71,7 +71,7 @@ class Response
     }
 
     /**
-     * تعيين نوع المحتوى (Content-Type)
+     * Set the Content-Type header.
      * 
      * @param string $val
      * @return self
@@ -82,10 +82,10 @@ class Response
     }
 
     /**
-     * تحضير استجابة بصيغة JSON
+     * Prepare a JSON response.
      * 
-     * @param array $data البيانات المراد تحويلها لـ JSON
-     * @param int $status كود حالة الـ HTTP (الافتراضي 200)
+     * @param array $data Data to be encoded as JSON
+     * @param int $status HTTP status code (default 200)
      * @return self
      */
     public function json(array $data = [], int $status = 200): self
@@ -105,7 +105,7 @@ class Response
     }
 
     /**
-     * الحصول على المحتوى الحالي المخزن
+     * Get the current response body content.
      * 
      * @return string|null
      */
@@ -115,7 +115,7 @@ class Response
     }
 
     /**
-     * تعيين محتوى الاستجابة بشكل مباشر
+     * Set the response body content directly.
      * 
      * @param string $body
      * @return self
@@ -127,10 +127,10 @@ class Response
     }
 
     /**
-     * تحضير استجابة بصيغة HTML (الوضع الافتراضي)
+     * Prepare an HTML response (default mode).
      * 
-     * @param string $content كود الـ HTML
-     * @param int $status كود حالة الـ HTTP (الافتراضي 200)
+     * @param string $content HTML code
+     * @param int $status HTTP status code (default 200)
      * @return self
      */
     public function html(string $content = "", int $status = 200): self
@@ -142,9 +142,11 @@ class Response
     }
 
     /**
-     * إعادة توجيه المستخدم (Redirect) إلى مسار آخر
+     * Redirect the user to another URL.
      * 
-     * @param string $url الرابط المراد التوجه إليه
+     * @param string $url The target URL
+     * @param int $status HTTP status code (default 302)
+     * @param bool $allowExternal Whether to allow redirects to external domains
      * @return self
      */
     public function redirect(string $url, int $status = 302, bool $allowExternal = false): self
@@ -156,7 +158,7 @@ class Response
     }
 
     /**
-     * مسح المحتوى الحالي وتفريغ كائن الاستجابة
+     * Clear current body content and reset the response object.
      * 
      * @return self
      */

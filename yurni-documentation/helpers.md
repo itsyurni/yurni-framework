@@ -1,84 +1,92 @@
-# الأدوات المساعدة (Helpers)
+# 🧰 Helper Functions
 
-Yurni يوفر مجموعة دوال مساعدة جاهزة للتطوير السريع.
+The **Yurni Framework** includes a collection of global helper functions designed to streamline your development process and reduce boilerplate code.
 
-## `env($key, $default = null)`
+---
 
-جلب قيمة من متغيرات البيئة.
+## 🌍 Core Helpers
 
+### `env($key, $default = null)`
+Retrieves a value from your `.env` file.
 ```php
 $host = env('DB_HOST', '127.0.0.1');
 ```
 
-## `config($key, $default = null)`
-
-قراءة إعداد من `Config` أو البيئة.
-
+### `config($key, $default = null)`
+Reads a configuration value from the `Config` registry or environment.
 ```php
 $debug = config('APP_DEBUG', false);
 ```
 
-## `view($view, $args = [])`
-
-عرض قالب بسرعة.
-
+### `base_path($path = '')`
+Returns the absolute path to your project's root directory.
 ```php
-echo view('home', ['title' => 'الرئيسية']);
+$logPath = base_path('storage/logs/app.log');
 ```
 
-## `redirect($url, int $status = 302, bool $allowExternal = false)`
+---
 
-إعادة توجيه المستخدم.
+## 🎨 View & UI Helpers
 
+### `view($view, $args = [])`
+Renders a template and returns the HTML string.
 ```php
-redirect('/login');
+echo view('welcome', ['user' => 'Guest']);
 ```
 
-## `csrf_field()` و `csrf_token()`
+### `csrf_field()`
+Generates a hidden HTML input field containing the CSRF token.
+```html
+<form method="POST">
+    <?= csrf_field() ?>
+</form>
+```
 
+### `csrf_token()`
+Retrieves the current CSRF token string.
 ```php
-<?= csrf_field() ?>
 $token = csrf_token();
 ```
 
-## `db()`
+---
 
-مصدر سريع لكائن قاعدة البيانات.
+## 🛠️ Logic & Session Helpers
 
+### `redirect($url, int $status = 302, bool $allowExternal = false)`
+Sends a redirect header and terminates execution immediately.
 ```php
-$users = db()->table('users')->get();
+redirect('/dashboard');
 ```
 
-## `session()`
+### `session($key = null, $value = null)`
+Get or set session values easily.
+- **Get**: `session('user_id')`
+- **Set**: `session('user_id', 42)`
 
-استخدام الجلسة بطريقة بسيطة.
-
+### `flash($key = null, $message = null)`
+Set or retrieve "flash" messages that expire after one read.
 ```php
-session('locale', 'ar');
-$current = session('locale');
+flash('success', 'Operation completed!');
+$msg = flash('success');
 ```
 
-## `flash()`
+---
 
-حفظ واسترجاع رسائل فلاش.
+## 🗄️ Database & Debugging
 
+### `db()`
+Returns the singleton instance of the database connection.
 ```php
-flash('success', 'تم الحفظ');
-$message = flash('success');
+$users = db()->table('users')->where('active', 1)->get();
 ```
 
-## `dd()`
-
-طباعة بيانات التصحيح وإيقاف التنفيذ.
-
+### `dd(...$vars)`
+"Dump and Die" - prints the given variables in a readable format and stops script execution.
 ```php
-dd($user, $posts);
+dd($userData, $request->inputs());
 ```
 
-## `base_path($path = '')`
+---
 
-جلب المسار الكامل للمشروع أو ملف بداخله.
-
-```php
-$path = base_path('app/views');
-```
+## 💡 Usage Tip
+These helpers are globally available throughout your application. You can use them in Controllers, Models, and even directly in your Template files (if PHP execution is allowed).

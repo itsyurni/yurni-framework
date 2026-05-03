@@ -16,18 +16,18 @@ use yurni\Exception\QueryException;
  *  Db — Database Connection Manager
  * ====================================================================
  *
- * كلاس إدارة الاتصال بقاعدة البيانات.
- * يعتمد نمط Singleton لضمان اتصال PDO واحد طوال دورة حياة الطلب.
+ * Database connection management class.
+ * Uses the Singleton pattern to ensure a single PDO connection throughout the request lifecycle.
  *
- * الميزات:
- *  - UTF-8 كامل (charset + collation)
- *  - Strict mode لـ MySQL
- *  - سجل استعلامات (Query Log) قابل للتفعيل
- *  - إحصاءات وقت التنفيذ لكل استعلام
- *  - transaction helpers (beginTransaction / commit / rollback)
- *  - Query Builder fluent API عبر table() و query()
- *  - statement() و select() و insertGetId() للتوافق الخلفي
- *  - getPdo() لمن يحتاج الكائن الأصلي مباشرةً
+ * Features:
+ *  - Full UTF-8 support (charset + collation)
+ *  - MySQL Strict mode enabled
+ *  - Optional Query Logging
+ *  - Execution time tracking per query
+ *  - Transaction helpers (beginTransaction / commit / rollback)
+ *  - Fluent Query Builder API via table() and query()
+ *  - statement(), select(), and insertGetId() for backward compatibility
+ *  - getPdo() for direct access to the underlying PDO instance
  *
  * @package yurni
  */
@@ -111,9 +111,8 @@ class Db
 
     private function connect(): void
     {
-        // Config keys تطابق ما هو موثق في README:
+        // Config keys match README documentation:
         // DB_DRIVER / DB_HOST / DB_NAME / DB_USER / DB_PASS
-        // Config::get() تحوّل المفتاح إلى lowercase داخلياً.
         $driver = strtolower(Config::get('db_driver', 'mysql'));
         $host = Config::get('db_host', '127.0.0.1');
         $port = Config::get('db_port', $driver === 'pgsql' ? '5432' : '3306');
@@ -125,7 +124,6 @@ class Db
         [$dsn, $options] = match ($driver) {
 
             // ── SQLite ──────────────────────────────────────────────────────
-            // DB_NAME يُستخدم كمسار للملف، أو ':memory:' للاختبار.
             'sqlite' => [
                 "sqlite:{$dbname}",
                 [
@@ -145,7 +143,7 @@ class Db
                 ],
             ],
 
-            // ── MySQL / MariaDB (الافتراضي) ─────────────────────────────────
+            // ── MySQL / MariaDB (Default) ───────────────────────────────────
             default => [
                 "mysql:host={$host};port={$port};dbname={$dbname};charset={$charset}",
                 [
@@ -189,10 +187,10 @@ class Db
     // =========================================================================
 
     /**
-     * تنفيذ استعلام Prepared Statement وإرجاع الـ PDOStatement.
+     * Execute a Prepared Statement and return the PDOStatement.
      *
-     * @param string $sql      نص الاستعلام
-     * @param array  $bindings القيم المربوطة
+     * @param string $sql      SQL query string
+     * @param array  $bindings Bound values
      * @return PDOStatement
      *
      * @throws QueryException
@@ -221,7 +219,7 @@ class Db
     }
 
     /**
-     * تنفيذ SELECT وإرجاع جميع الصفوف.
+     * Execute a SELECT query and return all rows.
      *
      * @param string $sql
      * @param array  $bindings
@@ -233,7 +231,7 @@ class Db
     }
 
     /**
-     * تنفيذ SELECT وإرجاع أول صف فقط.
+     * Execute a SELECT query and return the first row only.
      *
      * @param string $sql
      * @param array  $bindings
@@ -246,7 +244,7 @@ class Db
     }
 
     /**
-     * تنفيذ INSERT / UPDATE / DELETE وإرجاع عدد الصفوف المتأثرة.
+     * Execute INSERT / UPDATE / DELETE and return the number of affected rows.
      *
      * @param string $sql
      * @param array  $bindings
@@ -258,7 +256,7 @@ class Db
     }
 
     /**
-     * تنفيذ INSERT وإرجاع آخر ID تم إدراجه.
+     * Execute an INSERT query and return the last inserted ID.
      *
      * @param string $sql
      * @param array  $bindings
@@ -271,8 +269,8 @@ class Db
     }
 
     /**
-     * تنفيذ استعلام بدون Prepared Statement (DDL فقط).
-     * تحذير: لا تستخدم مع مدخلات المستخدم.
+     * Execute a query without a Prepared Statement (DDL only).
+     * WARNING: Do not use with user-provided input.
      *
      * @param string $sql
      * @return int
@@ -298,7 +296,7 @@ class Db
     // =========================================================================
 
     /**
-     * بدء transaction.
+     * Begin a database transaction.
      */
     public function beginTransaction(): void
     {
@@ -308,7 +306,7 @@ class Db
     }
 
     /**
-     * تأكيد transaction.
+     * Commit the current transaction.
      */
     public function commit(): void
     {
@@ -318,7 +316,7 @@ class Db
     }
 
     /**
-     * إلغاء transaction.
+     * Rollback the current transaction.
      */
     public function rollback(): void
     {
@@ -328,10 +326,10 @@ class Db
     }
 
     /**
-     * تنفيذ Closure داخل transaction مع Rollback تلقائي عند الخطأ.
+     * Execute a Closure within a transaction with automatic Rollback on error.
      *
      * @param  callable $callback
-     * @return mixed نتيجة الـ callback
+     * @return mixed Result of the callback
      *
      * @throws \Throwable
      */
@@ -349,7 +347,7 @@ class Db
     }
 
     /**
-     * هل نحن داخل transaction نشطة؟
+     * Is the connection currently in a transaction?
      */
     public function inTransaction(): bool
     {
@@ -361,7 +359,7 @@ class Db
     // =========================================================================
 
     /**
-     * تفعيل سجل الاستعلامات.
+     * Enable query logging.
      */
     public function enableQueryLog(): void
     {
@@ -369,7 +367,7 @@ class Db
     }
 
     /**
-     * تعطيل سجل الاستعلامات.
+     * Disable query logging.
      */
     public function disableQueryLog(): void
     {
@@ -377,7 +375,7 @@ class Db
     }
 
     /**
-     * استرجاع سجل الاستعلامات المنفذة.
+     * Retrieve the executed query log.
      *
      * @return array<int, array{sql: string, bindings: array, time_ms: float}>
      */
@@ -387,7 +385,7 @@ class Db
     }
 
     /**
-     * مسح سجل الاستعلامات.
+     * Clear the query log.
      */
     public function flushQueryLog(): void
     {
@@ -395,7 +393,7 @@ class Db
     }
 
     /**
-     * إجمالي وقت تنفيذ جميع الاستعلامات المسجلة (بالميلي ثانية).
+     * Get the total execution time of all logged queries (in ms).
      */
     public function getTotalQueryTime(): float
     {
@@ -407,7 +405,7 @@ class Db
     // =========================================================================
 
     /**
-     * تسجيل استعلام داخلياً إن كان التسجيل مفعّلاً.
+     * Log a query internally if logging is enabled.
      */
     private function logQuery(string $sql, array $bindings, float $timeMs): void
     {
@@ -431,21 +429,21 @@ class Db
     }
 
     // =========================================================================
-    //  Magic — لا حاجة لـ __call بعد الآن؛ كل شيء معرَّف صراحةً
+    //  Magic Methods
     // =========================================================================
 
     /**
-     * منع الاستنساخ (Clone) للحفاظ على نمط Singleton.
+     * Prevent cloning to maintain Singleton pattern.
      */
     private function __clone()
     {
     }
 
     /**
-     * منع إعادة البناء من Serialize.
+     * Prevent deserialization.
      */
     public function __wakeup(): void
     {
-        throw new \LogicException('يُحظر Unserialize كائن Db.');
+        throw new \LogicException('Deserialization of Db instance is prohibited.');
     }
 }

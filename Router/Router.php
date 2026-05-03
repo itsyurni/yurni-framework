@@ -6,38 +6,38 @@ use yurni\Http\Response;
 use yurni\Http\Request;
 
 /**
- * كلاس الموجه (Router)
- * مسؤول عن تسجيل ومعالجة الروابط (Routes) وتوجيهها للمتحكمات (Controllers) المناسبة.
+ * Router Class
+ * Responsible for registering and processing application routes and directing them to the appropriate controllers.
  */
 class Router
 {
     /**
-     * @var Application كائن التطبيق الأساسي
+     * @var Application Core application instance
      */
     protected Application $app;
 
     /**
-     * @var Request كائن الطلب
+     * @var Request Request instance
      */
     protected Request $request;
 
     /**
-     * @var Response كائن الاستجابة
+     * @var Response Response instance
      */
     protected Response $response;
 
     /**
-     * @var array مصفوفة تحتوي على كل المسارات المسجلة
+     * @var array Array containing all registered routes
      */
     protected array $routes = [];
 
     /**
-     * @var array مصفوفة دوال معالجة الأخطاء (مثل 404, 500)
+     * @var array Array of error handling callbacks (e.g., 404, 500)
      */
     protected array $handle = [];
 
     /**
-     * منشئ الكلاس (Constructor)
+     * Router constructor.
      *
      * @param Application $app
      */
@@ -47,7 +47,7 @@ class Router
         $this->request = $this->app->request;
         $this->response = $this->app->response;
 
-        // استجابة افتراضية في حالة عدم العثور على المسار
+        // Default response for Page Not Found
         $this->handle("404", function () {
             http_response_code(404);
             $this->app->renderErrorPage('404');
@@ -59,11 +59,11 @@ class Router
     // -------------------------------------------------------------------------
 
     /**
-     * تسجيل مسار جديد
+     * Register a new route.
      *
-     * @param array|string   $method طرق الطلب (مثل 'get', ['get', 'post'])
-     * @param string         $uri    الرابط
-     * @param callable|array $action الدالة أو المتحكم المطلوب
+     * @param array|string   $method HTTP methods (e.g., 'get', ['get', 'post'])
+     * @param string         $uri    The URI path
+     * @param callable|array $action Callback or controller action
      * @return Route
      */
     public function register($method, string $uri, $action): Route
@@ -76,7 +76,7 @@ class Router
     }
 
     /**
-     * الحصول على جميع المسارات المسجلة
+     * Get all registered routes.
      *
      * @return array
      */
@@ -90,10 +90,10 @@ class Router
     // -------------------------------------------------------------------------
 
     /**
-     * تسجيل دالة مخصصة لمعالجة أخطاء معينة (مثل 404, 500)
+     * Register a custom callback to handle specific errors (e.g., 404, 500).
      *
-     * @param string   $type     نوع الخطأ
-     * @param callable $callback الدالة المراد تنفيذها
+     * @param string   $type     Error type/code
+     * @param callable $callback The callback function
      */
     public function handle(string $type, callable $callback): void
     {
@@ -101,7 +101,7 @@ class Router
     }
 
     /**
-     * تنفيذ دالة معالجة الخطأ المحفوظة
+     * Execute a stored error handling callback.
      *
      * @param string $type
      * @return mixed
@@ -116,11 +116,11 @@ class Router
     // -------------------------------------------------------------------------
 
     /**
-     * تحويل رابط المسار إلى تعبير نمطي (Regex) للمطابقة.
+     * Convert a route URI into a Regular Expression for matching.
      *
-     * تدعم صيغة {param} فقط — المستخدم يتحكم بالنوع بنفسه.
+     * Supports {param} syntax for dynamic segments.
      *
-     * مثال:
+     * Example:
      *   /user/{id}        →  /^\/user\/(?P<id>[^\/]+)$/i
      *   /post/{slug}/edit →  /^\/post\/(?P<slug>[^\/]+)\/edit$/i
      *
@@ -129,10 +129,10 @@ class Router
      */
     public function routeToRegex(string $route): string
     {
-        // تهيئة الـ Slashes
+        // Escape forward slashes
         $route = preg_replace("/\\//", "\/", $route);
 
-        // تحويل {param} إلى Named Capture Group
+        // Convert {param} placeholders into Named Capture Groups
         $route = preg_replace_callback(
             '/\{([a-zA-Z0-9_]+)\}/',
             function ($matches) {
@@ -145,10 +145,10 @@ class Router
     }
 
     /**
-     * البحث عن المسار المطابق للطلب الحالي
+     * Find the route matching the current request.
      *
-     * @param string $path   رابط الطلب الفعلي
-     * @param string $method طريقة الطلب (مثل 'get', 'post')
+     * @param string $path   The actual request path
+     * @param string $method The HTTP request method
      * @return Route|false
      */
     protected function findRoute(string $path, string $method)
@@ -158,7 +158,7 @@ class Router
                 preg_match($route->getUri(), $path, $matches) &&
                 in_array($method, (array) $route->getMethod())
             ) {
-                // تخزين المتغيرات الملتقطة داخل كائن المسار
+                // Store captured parameters in the Route object
                 foreach ($matches as $key => $val) {
                     if (is_string($key)) {
                         $route->setParam($key, $val);
@@ -171,7 +171,7 @@ class Router
     }
 
     /**
-     * تنفيذ الدالة المسؤولة عن المسار وإرجاع النتيجة للـ Client
+     * Execute the callback responsible for the route and return the result.
      *
      * @param callable|array $callback
      * @param array          $args
@@ -181,12 +181,12 @@ class Router
     {
         $output = $this->app->container()->injectArgs($args)->call($callback);
 
-        // إذا كان المخرج كائن Response (مثل redirect) نرجعه مباشرة
+        // If the output is a Response object, return its body
         if ($output instanceof Response) {
             return $output->body();
         }
 
-        // تحويل المصفوفات تلقائياً إلى JSON
+        // Automatically convert arrays to JSON
         if (is_array($output)) {
             return $this->response->json($output)->body();
         }
@@ -195,7 +195,7 @@ class Router
     }
 
     /**
-     * تحليل الطلب الحالي والعثور على المسار المناسب وتنفيذه
+     * Resolve the current request and execute the appropriate route.
      *
      * @return mixed
      */
@@ -210,10 +210,10 @@ class Router
             return $this->getHandle("404");
         }
 
-        // حفظ كائن المسار داخل كائن الطلب
+        // Save the Route object within the Request object
         $this->request->setRoute($route);
 
-        // تشغيل الـ Middlewares المسجلة على هذا المسار
+        // Execute Middlewares registered for this route
         if (!$this->runMiddlewares($route)) {
             return false;
         }
@@ -222,10 +222,10 @@ class Router
     }
 
     /**
-     * تشغيل البرمجيات الوسيطة الخاصة بمسار معين
+     * Execute Middlewares for a specific route.
      *
      * @param Route $route
-     * @return bool يعيد false إذا تم حظر الطلب من قبل أحد الـ Middlewares
+     * @return bool Returns false if the request was blocked by a middleware
      */
     private function runMiddlewares(\yurni\Router\Route $route): bool
     {

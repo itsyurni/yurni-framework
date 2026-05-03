@@ -1,9 +1,12 @@
-# النماذج (Models)
+# 🏛️ Models & ORM
 
-`Model` هو الطبقة المسؤولة عن التعامل مع قواعد البيانات بطريقة كائنية.
-يمكنك إنشاء نموذج جديد بامتداد الكلاس الأساسي `yurni\Model`.
+The **Yurni Framework** provides a lightweight Model layer that allows you to interact with your database using an object-oriented approach. By extending `yurni\Model`, you inherit powerful CRUD capabilities and relationship management features.
 
-## إعلان نموذج جديد
+---
+
+## 🏗️ Creating a Model
+
+Models are typically stored in the `app/Models` directory. You can customize the table name, primary key, and soft delete behavior.
 
 ```php
 <?php
@@ -13,133 +16,106 @@ use yurni\Model;
 
 class User extends Model
 {
+    // If not specified, the table name is pluralized from the class name (e.g., 'users')
     protected string $table = 'users';
+
+    // Specify the primary key (default: 'id')
     protected string $primaryKey = 'id';
+
+    // Enable soft deletes (default: false)
     protected bool $softDeletes = true;
 }
 ```
 
-إذا لم تحدد اسم الجدول، الاسم يُستنتج تلقائيًا من اسم الكلاس.
+---
 
-## دوال CRUD الأساسية
+## 🛠️ Core CRUD Operations
 
-### `all(array|string $columns = ['*']): array`
+Most Model methods can be called statically for convenience.
 
-استرجاع جميع السجلات.
-
+### Retrieval
 ```php
+// Get all records
 $users = User::all();
-```
 
-### `find(int|string $id, array|string $columns = ['*']): ?array`
-
-إيجاد سجل واحد بواسطة المفتاح الأساسي.
-
-```php
+// Find a specific record by its primary key
 $user = User::find(5);
-```
 
-### `findOrFail(int|string $id, array|string $columns = ['*']): array`
-
-نفس `find` ولكن يرمي استثناءً إذا لم يجد.
-
-```php
+// Find a record or throw an exception if not found
 $user = User::findOrFail(5);
+
+// Paginate records
+$result = User::paginate(page: 1, perPage: 15);
+// Returns: ['data' => [...], 'total' => 100, 'per_page' => 15, 'current_page' => 1]
 ```
 
-### `create(array $attributes): int`
-
-إدراج سجل جديد وإرجاع الـ ID.
-
+### Persistence
 ```php
-$id = User::create(['name' => 'علي', 'email' => 'ali@example.com']);
+// Create a new record (returns the new ID)
+$id = User::create([
+    'name'  => 'John Doe',
+    'email' => 'john@example.com'
+]);
+
+// Update a record by ID
+User::updateById(5, ['name' => 'Jane Doe']);
 ```
 
-### `updateById(int|string $id, array $attributes): int`
-
-تحديث سجل موجود.
-
+### Deletion & Restoration
 ```php
-User::updateById(5, ['name' => 'أحمد']);
-```
-
-### `deleteById(int|string $id): int`
-
-حذف سجل. إذا كان `softDeletes` مفعلًا فسيُحدّف منطقيًا.
-
-```php
+// Delete a record (Soft deletes if $softDeletes is true)
 User::deleteById(5);
-```
 
-### `restore(int|string $id): int`
-
-استعادة سجل بعد حذف منطقي (soft delete).
-
-```php
+// Restore a soft-deleted record
 User::restore(5);
-```
 
-### `forceDeleteById(int|string $id): int`
-
-حذف نهائي.
-
-```php
+// Permanently delete a record
 User::forceDeleteById(5);
 ```
 
-### `paginate(int $page = 1, int $perPage = 15): array`
+---
 
-دعم ترقيم الصفحات.
+## 🔗 Relationships
 
+Yurni supports standard relationship patterns to link your data.
+
+### `belongsTo`
+Used for the "child" side of a relationship (e.g., a Comment belongs to a Post).
 ```php
-$page = User::paginate(2, 20);
+$post = $comment->belongsTo(Post::class, foreignKey: 'post_id')->first();
 ```
 
-## العلاقات
-
-### `belongsTo(string $related, ?string $foreignKey = null, string $ownerKey = 'id', mixed $value = null)`
-
-علاقة `belongsTo` بسيطة.
-
+### `hasMany`
+Used for the "parent" side of a relationship (e.g., a User has many Posts).
 ```php
-$comment->belongsTo(Post::class, 'post_id', 'id', $comment['post_id'])->first();
+$posts = (new User())->hasMany(Post::class, foreignKey: 'user_id', localValue: $user['id'])->get();
 ```
 
-### `hasMany(string $related, ?string $foreignKey = null, mixed $localValue = null, ?string $localKey = null)`
-
-علاقة `hasMany`.
-
+### `hasOne`
+Used for a 1-to-1 relationship (e.g., a User has one Profile).
 ```php
-$posts = (new User())->hasMany(Post::class, 'user_id', $userId)->get();
+$profile = (new User())->hasOne(Profile::class, foreignKey: 'user_id', localValue: $user['id'])->first();
 ```
 
-### `hasOne(string $related, ?string $foreignKey = null, mixed $localValue = null, ?string $localKey = null)`
+---
 
-علاقة `hasOne`.
+## 🔍 Advanced Queries
 
-```php
-$profile = (new User())->hasOne(Profile::class, 'user_id', $userId)->first();
-```
-
-## استعلامات مخصصة
-
-يمكنك استخدام جميع دوال Query Builder من خلال أي نموذج:
+Since `Model` proxies calls to the `QueryBuilder`, you can chain complex queries directly on your models.
 
 ```php
-$activeUsers = User::where('active', 1)
-    ->orderBy('created_at', 'desc')
-    ->limit(20)
+// Static query chaining
+$admins = User::where('role', 'admin')
+    ->where('active', 1)
+    ->orderBy('name', 'asc')
+    ->limit(10)
     ->get();
 ```
 
-أو عبر نموذج:
+---
 
-```php
-$users = (new User())->query()
-    ->where('role', 'admin')
-    ->get();
-```
+## 💡 Best Practices
 
-## ملاحظة
-
-`Model` يعتمد على `Db::getInstance()` و `QueryBuilder` لإجراء جميع العمليات بأمان وقابلية إعادة الاستخدام.
+- **Naming Conventions**: Use singular class names (e.g., `Post`, `Comment`).
+- **Validation**: Perform data validation in your Controller or Service layer before calling Model methods.
+- **Soft Deletes**: Always include a `deleted_at` column (TIMESTAMP) in your database table if you enable `$softDeletes`.
