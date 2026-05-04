@@ -1,6 +1,6 @@
 <?php
 
-namespace yurni\Helpers;
+namespace yurni\Http;
 
 /**
  * Validator

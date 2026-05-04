@@ -33,10 +33,12 @@ class Router
      */
     protected array $routes = [];
 
-    /**
-     * @var array Array of error handling callbacks (e.g., 404, 500)
-     */
     protected array $handle = [];
+    
+    /**
+     * @var Response|null Response returned by a middleware that should override the normal flow
+     */
+    protected ?Response $middlewareResponse = null;
 
     /**
      * Router constructor.
@@ -217,6 +219,10 @@ class Router
 
         // Execute Middlewares registered for this route
         if (!$this->runMiddlewares($route)) {
+            // If a middleware returned a specific response, return its body
+            if ($this->middlewareResponse) {
+                return $this->middlewareResponse->body();
+            }
             return false;
         }
 
@@ -232,11 +238,21 @@ class Router
     private function runMiddlewares(\yurni\Router\Route $route): bool
     {
         foreach ($route->getMiddlewares() as $key) {
-            if (!$this->app->getMiddleware($key)) {
+            $result = $this->app->getMiddleware($key);
+
+            // If middleware returns false, block request with default 403
+            if ($result === false) {
                 if (http_response_code() === 200) {
                     http_response_code(403);
                     $this->app->renderErrorPage('403');
                 }
+                return false;
+            }
+
+            // If middleware returns a Response object, it means we should stop and return it
+            if ($result instanceof Response) {
+                // Store the middleware response so resolve() can return it
+                $this->middlewareResponse = $result;
                 return false;
             }
         }

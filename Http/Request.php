@@ -3,7 +3,7 @@ namespace yurni\Http;
 
 use yurni\Application;
 use yurni\Router\Route;
-
+// use yurni\Http\Validator;
 
 /**
  * كلاس الطلب (Request)
@@ -414,7 +414,7 @@ class Request
      */
     public function validate(array $rules, array $messages = []): array
     {
-        $validator = \yurni\Helpers\Validator::make($this->inputs(), $rules, $messages);
+        $validator = Validator::make($this->inputs(), $rules, $messages);
 
         if ($validator->fails()) {
             $session = $this->getSession();
