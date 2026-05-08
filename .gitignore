@@ -1,4 +1,0 @@
-/vendor/
-.env
-/app/views/cache/*
-!/app/views/cache/.gitkeep
